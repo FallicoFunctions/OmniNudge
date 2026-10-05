@@ -36,20 +36,18 @@ export default function ModToolsPage() {
       <div className="mb-6 flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold">{t('modToolsPage.header.title', { hub: hubName })}</h1>
-          <p className="text-[var(--color-text-secondary)] mt-2">
-            {t('modToolsPage.header.subtitle')}
-          </p>
+          <p className="text-text-secondary mt-2">{t('modToolsPage.header.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => navigate(`/h/${hubName}`)}
-            className="px-4 py-2 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+            className="px-4 py-2 rounded-sm bg-(--color-surface-elevated) text-text-primary hover:bg-border transition-colors"
           >
             {t('modToolsPage.actions.exit')}
           </button>
           <button
             onClick={() => navigate(`/h/${hubName}/settings`)}
-            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] transition-colors"
+            className="px-4 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) transition-colors"
           >
             {t('modToolsPage.actions.hubSettings')}
           </button>
@@ -57,14 +55,14 @@ export default function ModToolsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-[var(--color-border)] mb-6">
+      <div className="border-b border-border mb-6">
         <nav className="flex space-x-8">
           <button
             onClick={() => setActiveTab('bans')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'bans'
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
             }`}
           >
             {t('modToolsPage.tabs.userBans')}
@@ -73,8 +71,8 @@ export default function ModToolsPage() {
             onClick={() => setActiveTab('removal_reasons')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'removal_reasons'
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
             }`}
           >
             {t('modToolsPage.tabs.removalReasons')}
@@ -83,8 +81,8 @@ export default function ModToolsPage() {
             onClick={() => setActiveTab('mod_log')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'mod_log'
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
             }`}
           >
             {t('modToolsPage.tabs.modLog')}
@@ -93,8 +91,8 @@ export default function ModToolsPage() {
             onClick={() => setActiveTab('mod_mail')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'mod_mail'
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
             }`}
           >
             {t('modToolsPage.tabs.modMail')}
@@ -103,8 +101,8 @@ export default function ModToolsPage() {
             onClick={() => setActiveTab('requests')}
             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'requests'
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-gray-300'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-300'
             }`}
           >
             {t('modToolsPage.tabs.requests')}
@@ -156,7 +154,7 @@ function BansTab({ hubName }: { hubName: string }) {
         <h2 className="text-xl font-semibold">{t('modToolsPage.bans.title')}</h2>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90"
         >
           {showAddForm ? t('common.cancel') : t('modToolsPage.bans.actions.banUser')}
         </button>
@@ -174,9 +172,9 @@ function BansTab({ hubName }: { hubName: string }) {
 
       {bans && bans.length === 0 && (
         <div className="text-center py-12 px-4">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-(--color-surface-elevated) mb-4">
             <svg
-              className="w-8 h-8 text-[var(--color-text-secondary)]"
+              className="w-8 h-8 text-text-secondary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -190,15 +188,13 @@ function BansTab({ hubName }: { hubName: string }) {
               />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
+          <h3 className="text-lg font-semibold text-text-primary mb-2">
             {t('modToolsPage.bans.empty.title')}
           </h3>
-          <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto mb-4">
+          <p className="text-sm text-text-secondary max-w-md mx-auto mb-4">
             {t('modToolsPage.bans.empty.description')}
           </p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {t('modToolsPage.bans.empty.help')}
-          </p>
+          <p className="text-xs text-(--color-text-muted)">{t('modToolsPage.bans.empty.help')}</p>
         </div>
       )}
 
@@ -206,22 +202,22 @@ function BansTab({ hubName }: { hubName: string }) {
         {bans?.map((ban: HubBan) => (
           <div
             key={ban.id}
-            className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+            className="p-4 border border-border rounded-lg bg-(--color-surface-elevated)"
           >
             <div className="flex justify-between items-start">
               <div>
                 <div className="font-medium">
                   {ban.username || t('common.userNumber', { id: ban.user_id })}
                 </div>
-                <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                <div className="text-sm text-text-secondary mt-1">
                   {ban.reason || t('modToolsPage.bans.noReason')}
                 </div>
                 {ban.note && (
-                  <div className="text-xs text-[var(--color-text-secondary)] mt-1 italic">
+                  <div className="text-xs text-text-secondary mt-1 italic">
                     {t('modToolsPage.bans.modNote', { note: ban.note })}
                   </div>
                 )}
-                <div className="text-xs text-[var(--color-text-secondary)] mt-2">
+                <div className="text-xs text-text-secondary mt-2">
                   {ban.ban_type === 'permanent' ? (
                     <span className="text-red-600 font-medium">
                       {t('modToolsPage.bans.permanent')}
@@ -253,7 +249,7 @@ function BansTab({ hubName }: { hubName: string }) {
               <button
                 onClick={() => unbanMutation.mutate(ban.user_id)}
                 disabled={unbanMutation.isPending}
-                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded-sm hover:bg-green-700 disabled:opacity-50"
               >
                 {t('modToolsPage.bans.actions.unban')}
               </button>
@@ -302,10 +298,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
-    >
+    <form onSubmit={handleSubmit} className="mb-6 p-4 border border-border rounded-lg bg-surface">
       <h3 className="font-medium mb-4">{t('modToolsPage.bans.form.title')}</h3>
 
       <div className="space-y-4">
@@ -318,7 +311,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
             type="number"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+            className="w-full px-3 py-2 border border-border rounded-lg"
             required
           />
         </div>
@@ -330,7 +323,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
           <select
             value={banType}
             onChange={(e) => setBanType(e.target.value as 'permanent' | 'temporary')}
-            className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+            className="w-full px-3 py-2 border border-border rounded-lg"
           >
             <option value="permanent">
               {t('modToolsPage.bans.form.fields.banType.permanent')}
@@ -351,7 +344,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+              className="w-full px-3 py-2 border border-border rounded-lg"
               required={banType === 'temporary'}
             />
           </div>
@@ -364,7 +357,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+            className="w-full px-3 py-2 border border-border rounded-lg"
             rows={2}
             placeholder={t('modToolsPage.bans.form.fields.reason.placeholder')}
           />
@@ -377,7 +370,7 @@ function AddBanForm({ hubName, onSuccess }: { hubName: string; onSuccess: () => 
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+            className="w-full px-3 py-2 border border-border rounded-lg"
             rows={2}
             placeholder={t('modToolsPage.bans.form.fields.note.placeholder')}
           />
@@ -435,7 +428,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
             setShowAddForm(!showAddForm);
             setEditingReason(null);
           }}
-          className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90"
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90"
         >
           {showAddForm ? t('common.cancel') : t('modToolsPage.removalReasons.addTemplate')}
         </button>
@@ -467,15 +460,13 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
         {reasons?.map((reason: RemovalReason) => (
           <div
             key={reason.id}
-            className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+            className="p-4 border border-border rounded-lg bg-(--color-surface-elevated)"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="font-medium">{reason.title}</div>
-                <div className="text-sm text-[var(--color-text-secondary)] mt-1">
-                  {reason.message}
-                </div>
-                <div className="text-xs text-[var(--color-text-secondary)] mt-2">
+                <div className="text-sm text-text-secondary mt-1">{reason.message}</div>
+                <div className="text-xs text-text-secondary mt-2">
                   {t('modToolsPage.removalReasons.lastUpdated', {
                     date: formatDate(reason.updated_at, {
                       month: 'short',
@@ -488,7 +479,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
               <div className="flex space-x-2">
                 <button
                   onClick={() => setEditingReason(reason)}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded-sm hover:bg-blue-700"
                 >
                   {t('common.edit')}
                 </button>
@@ -499,7 +490,7 @@ function RemovalReasonsTab({ hubName }: { hubName: string }) {
                     }
                   }}
                   disabled={deleteMutation.isPending}
-                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded-sm hover:bg-red-700 disabled:opacity-50"
                 >
                   {t('common.delete')}
                 </button>
@@ -550,10 +541,7 @@ function RemovalReasonForm({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mb-6 p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)]"
-    >
+    <form onSubmit={handleSubmit} className="mb-6 p-4 border border-border rounded-lg bg-surface">
       <h3 className="font-medium mb-4">
         {reason
           ? t('modToolsPage.removalReasons.form.editTitle')
@@ -570,7 +558,7 @@ function RemovalReasonForm({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+            className="w-full px-3 py-2 border border-border rounded-lg"
             maxLength={100}
             required
             placeholder={t('modToolsPage.removalReasons.form.fields.title.placeholder')}
@@ -585,7 +573,7 @@ function RemovalReasonForm({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg"
+            className="w-full px-3 py-2 border border-border rounded-lg"
             rows={3}
             required
             placeholder={t('modToolsPage.removalReasons.form.fields.message.placeholder')}
@@ -596,7 +584,7 @@ function RemovalReasonForm({
           <button
             type="submit"
             disabled={createMutation.isPending || updateMutation.isPending}
-            className="flex-1 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 disabled:opacity-50"
           >
             {createMutation.isPending || updateMutation.isPending
               ? t('modToolsPage.removalReasons.form.saving')
@@ -605,7 +593,7 @@ function RemovalReasonForm({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-surface-elevated)]"
+            className="px-4 py-2 border border-border rounded-lg hover:bg-(--color-surface-elevated)"
           >
             {t('common.cancel')}
           </button>
@@ -651,9 +639,9 @@ function ModLogTab({ hubName }: { hubName: string }) {
 
       {logs.length === 0 && (
         <div className="text-center py-12 px-4">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--color-surface-elevated)] mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-(--color-surface-elevated) mb-4">
             <svg
-              className="w-8 h-8 text-[var(--color-text-secondary)]"
+              className="w-8 h-8 text-text-secondary"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -667,10 +655,10 @@ function ModLogTab({ hubName }: { hubName: string }) {
               />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
+          <h3 className="text-lg font-semibold text-text-primary mb-2">
             {t('modToolsPage.modLog.empty.title')}
           </h3>
-          <p className="text-sm text-[var(--color-text-secondary)] max-w-md mx-auto">
+          <p className="text-sm text-text-secondary max-w-md mx-auto">
             {t('modToolsPage.modLog.empty.description')}
           </p>
         </div>
@@ -680,7 +668,7 @@ function ModLogTab({ hubName }: { hubName: string }) {
         {logs.map((log: ModLog) => (
           <div
             key={log.id}
-            className="p-3 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-sm"
+            className="p-3 border border-border rounded-lg bg-(--color-surface-elevated) text-sm"
           >
             <div className="flex justify-between items-start">
               <div>
@@ -688,12 +676,9 @@ function ModLogTab({ hubName }: { hubName: string }) {
                   {log.moderator_name ||
                     t('modToolsPage.modLog.moderatorFallback', { id: log.moderator_id })}
                 </span>
-                <span className="text-[var(--color-text-secondary)]">
-                  {' '}
-                  {getActionDescription(t, log)}
-                </span>
+                <span className="text-text-secondary"> {getActionDescription(t, log)}</span>
               </div>
-              <div className="text-xs text-[var(--color-text-secondary)]">
+              <div className="text-xs text-text-secondary">
                 {formatDate(log.created_at, {
                   month: 'short',
                   day: 'numeric',
@@ -704,7 +689,7 @@ function ModLogTab({ hubName }: { hubName: string }) {
               </div>
             </div>
             {log.details && Object.keys(log.details).length > 0 && (
-              <div className="text-xs text-[var(--color-text-secondary)] mt-1">
+              <div className="text-xs text-text-secondary mt-1">
                 {JSON.stringify(log.details, null, 2)}
               </div>
             )}
@@ -804,7 +789,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
           onChange={(e) =>
             setStatusFilter(e.target.value as 'open' | 'archived' | 'resolved' | 'all')
           }
-          className="px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-sm"
+          className="px-3 py-2 border border-border rounded-sm bg-surface text-sm"
         >
           <option value="open">{t('modToolsPage.modMail.status.open')}</option>
           <option value="archived">{t('modToolsPage.modMail.status.archived')}</option>
@@ -826,14 +811,14 @@ function ModMailTab({ hubName }: { hubName: string }) {
         {conversations.map((conv: ModMailConversation) => (
           <div
             key={conv.id}
-            className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+            className="p-4 border border-border rounded-lg bg-(--color-surface-elevated)"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => navigate(`/mod-mail/${conv.id}`)}
-                    className="text-lg font-medium hover:text-[var(--color-primary)]"
+                    className="text-lg font-medium hover:text-primary"
                   >
                     {conv.subject}
                   </button>
@@ -856,7 +841,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-[var(--color-text-secondary)] mt-1">
+                <div className="text-sm text-text-secondary mt-1">
                   <span>
                     {t('modToolsPage.modMail.from', {
                       username:
@@ -897,7 +882,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
                       onClick={() =>
                         updateStatusMutation.mutate({ conversationId: conv.id, status: 'resolved' })
                       }
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-sm hover:bg-blue-700"
                       disabled={updateStatusMutation.isPending}
                     >
                       {t('modToolsPage.modMail.actions.resolve')}
@@ -906,7 +891,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
                       onClick={() =>
                         updateStatusMutation.mutate({ conversationId: conv.id, status: 'archived' })
                       }
-                      className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+                      className="px-3 py-1 text-sm bg-gray-600 text-white rounded-sm hover:bg-gray-700"
                       disabled={updateStatusMutation.isPending}
                     >
                       {t('modToolsPage.modMail.actions.archive')}
@@ -918,7 +903,7 @@ function ModMailTab({ hubName }: { hubName: string }) {
                     onClick={() =>
                       updateStatusMutation.mutate({ conversationId: conv.id, status: 'open' })
                     }
-                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                    className="px-3 py-1 text-sm bg-green-600 text-white rounded-sm hover:bg-green-700"
                     disabled={updateStatusMutation.isPending}
                   >
                     {t('modToolsPage.modMail.actions.reopen')}
@@ -991,11 +976,11 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
     <div>
       <h2 className="text-xl font-semibold mb-4">{t('modToolsPage.requests.title')}</h2>
 
-      <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+      <div className="mb-6 rounded-lg border border-border bg-(--color-surface-elevated) p-4">
+        <h3 className="text-sm font-semibold text-text-primary">
           {t('modToolsPage.requests.grantByUsername.title')}
         </h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        <p className="mt-1 text-sm text-text-secondary">
           {t('modToolsPage.requests.grantByUsername.description')}
         </p>
         <form
@@ -1019,12 +1004,12 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
               }
             }}
             placeholder={t('modToolsPage.requests.grantByUsername.placeholder')}
-            className="flex-1 rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="flex-1 rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
           />
           <button
             type="submit"
             disabled={addUserMutation.isPending || usernameInput.trim().length === 0}
-            className="rounded bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {addUserMutation.isPending
               ? t('modToolsPage.requests.grantByUsername.granting')
@@ -1049,7 +1034,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
         {pendingRequests.map((request: AccessRequest) => (
           <div
             key={request.id}
-            className="p-4 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)]"
+            className="p-4 border border-border rounded-lg bg-(--color-surface-elevated)"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -1057,16 +1042,16 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
                   <span className="font-medium">
                     {request.username || t('common.userNumber', { id: request.user_id })}
                   </span>
-                  <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded">
+                  <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded-sm">
                     {t('modToolsPage.requests.status.pending')}
                   </span>
                 </div>
                 {request.message && (
-                  <div className="text-sm text-[var(--color-text-secondary)] mt-2 p-3 bg-[var(--color-surface)] rounded border border-[var(--color-border)]">
+                  <div className="text-sm text-text-secondary mt-2 p-3 bg-surface rounded-sm border border-border">
                     "{request.message}"
                   </div>
                 )}
-                <div className="text-xs text-[var(--color-text-secondary)] mt-2">
+                <div className="text-xs text-text-secondary mt-2">
                   {t('modToolsPage.requests.requestedOn', {
                     date: formatDate(request.created_at, {
                       month: 'short',
@@ -1084,7 +1069,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
                     }
                   }}
                   disabled={approveMutation.isPending || denyMutation.isPending}
-                  className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded-sm hover:bg-green-700 disabled:opacity-50"
                 >
                   {t('modToolsPage.requests.actions.approve')}
                 </button>
@@ -1095,7 +1080,7 @@ function AccessRequestsTab({ hubName }: { hubName: string }) {
                     }
                   }}
                   disabled={approveMutation.isPending || denyMutation.isPending}
-                  className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded-sm hover:bg-red-700 disabled:opacity-50"
                 >
                   {t('modToolsPage.requests.actions.deny')}
                 </button>

@@ -391,7 +391,7 @@ describe('AdminPage - Ban System', () => {
     });
 
     // Initially in card view
-    expect(screen.getByText('Card View')).toHaveClass(/bg-\[var\(--color-primary\)\]/);
+    expect(screen.getByText('Card View')).toHaveClass('bg-primary');
 
     // Switch to table view
     const tableViewButton = screen.getByText('Table View');

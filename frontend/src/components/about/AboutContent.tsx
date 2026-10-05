@@ -12,7 +12,7 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
   const { t } = useTranslation();
   const compact = variant === 'welcome';
   const linkClass =
-    'inline-flex min-h-10 items-center text-sm font-medium text-[var(--color-primary)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
+    'inline-flex min-h-10 items-center text-sm font-medium text-primary hover:underline focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2';
   const features = [
     { key: 'communities', to: '/hubs' },
     { key: 'messaging', to: '/messages' },
@@ -24,33 +24,29 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
       <header className="space-y-3">
         <h1
           id={compact ? 'welcome-title' : undefined}
-          className={`text-2xl font-bold text-[var(--color-text-primary)] ${compact ? '' : 'sm:text-3xl'}`}
+          className={`text-2xl font-bold text-text-primary ${compact ? '' : 'sm:text-3xl'}`}
         >
           {compact ? t('aboutPage.welcomeTitle') : t('common.brandName')}{' '}
-          <span className="ml-2 text-sm font-normal text-[var(--color-text-secondary)]">
+          <span className="ml-2 text-sm font-normal text-text-secondary">
             {t('aboutPage.betaLabel')}
           </span>
         </h1>
-        <p
-          className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-[var(--color-text-secondary)]`}
-        >
+        <p className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-text-secondary`}>
           {t('aboutPage.hero.description')}
         </p>
       </header>
 
       <section
-        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary)]/5 p-4 sm:p-5"
+        className="rounded-lg border border-border bg-primary/5 p-4 sm:p-5"
         aria-labelledby={compact ? 'welcome-omnirave' : 'about-omnirave'}
       >
         <h2
           id={compact ? 'welcome-omnirave' : 'about-omnirave'}
-          className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]"
+          className="mb-2 text-xl font-semibold text-text-primary"
         >
           {t('aboutPage.omnirave.title')}
         </h2>
-        <p
-          className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-[var(--color-text-secondary)]`}
-        >
+        <p className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-text-secondary`}>
           {t('aboutPage.omnirave.description')}
         </p>
         <Link to="/games/omnirave" onClick={onNavigate} className={`${linkClass} mt-2`}>
@@ -61,19 +57,17 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
       <section aria-labelledby={compact ? 'welcome-features' : 'about-features'}>
         <h2
           id={compact ? 'welcome-features' : 'about-features'}
-          className={`${compact ? 'sr-only' : 'mb-3 text-lg font-semibold'} text-[var(--color-text-primary)]`}
+          className={`${compact ? 'sr-only' : 'mb-3 text-lg font-semibold'} text-text-primary`}
         >
           {t('aboutPage.availableToday.title')}
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map(({ key, to }) => (
             <div key={key} className={key === 'hubDesigner' ? 'sm:col-span-2' : ''}>
-              <h3 className="mb-1 text-sm font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-1 text-sm font-semibold text-text-primary">
                 {t(`aboutPage.features.${key}.title`)}
               </h3>
-              <p
-                className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-[var(--color-text-secondary)]`}
-              >
+              <p className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-text-secondary`}>
                 {t(`aboutPage.features.${key}.description`)}
               </p>
               {key !== 'hubDesigner' && (
@@ -86,13 +80,11 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
         </div>
       </section>
 
-      <section className="border-t border-[var(--color-border)] pt-4">
-        <h2 className="mb-2 text-lg font-semibold text-[var(--color-text-primary)]">
+      <section className="border-t border-border pt-4">
+        <h2 className="mb-2 text-lg font-semibold text-text-primary">
           {t('aboutPage.roadmap.title')}
         </h2>
-        <p
-          className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-[var(--color-text-secondary)]`}
-        >
+        <p className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-text-secondary`}>
           {t('aboutPage.roadmap.dungeonMaster')}
         </p>
       </section>
@@ -100,12 +92,10 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
       {!compact &&
         ['vision', 'messagingEncryption', 'customization'].map((key) => (
           <section key={key}>
-            <h2 className="mb-2 text-lg font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-2 text-lg font-semibold text-text-primary">
               {t(`aboutPage.${key}.title`)}
             </h2>
-            <p
-              className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-[var(--color-text-secondary)]`}
-            >
+            <p className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-text-secondary`}>
               {t(`aboutPage.${key}.${key === 'vision' ? 'description' : 'paragraph1'}`)}
             </p>
           </section>
@@ -113,7 +103,7 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
 
       <nav
         aria-label={t('aboutPage.footer.label')}
-        className="flex flex-wrap gap-x-5 border-t border-[var(--color-border)] pt-3"
+        className="flex flex-wrap gap-x-5 border-t border-border pt-3"
       >
         {compact && (
           <Link to="/about" onClick={onNavigate} className={linkClass}>

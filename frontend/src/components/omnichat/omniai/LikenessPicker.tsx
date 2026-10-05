@@ -131,7 +131,7 @@ export default function LikenessPicker({
     return (
       <div
         role="status"
-        className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/65"
+        className="rounded-2xl border border-white/10 bg-white/3 p-5 text-sm text-white/65"
       >
         {waiting ? 'Generating character portraits…' : 'Portraits are unavailable right now.'}
         {!waiting && (
@@ -162,7 +162,7 @@ export default function LikenessPicker({
   return (
     <section
       aria-labelledby="omnichat-likeness-title"
-      className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+      className="rounded-2xl border border-white/10 bg-white/3 p-5"
     >
       <h3 id="omnichat-likeness-title" className="text-[15px] font-semibold text-white/90">
         {translate(t, 'omnichat.omniai.likeness.title', `Choose how ${p.subj} look${p.s}`)}
@@ -195,7 +195,7 @@ export default function LikenessPicker({
                     `Picture ${index + 1}, still arriving`
                   )
             }
-            className="group relative aspect-[9/16] overflow-hidden rounded-xl border border-white/10 bg-black/30 disabled:cursor-not-allowed"
+            className="group relative aspect-9/16 overflow-hidden rounded-xl border border-white/10 bg-black/30 disabled:cursor-not-allowed"
           >
             {candidate.ready ? (
               <img
@@ -218,7 +218,7 @@ export default function LikenessPicker({
         {Array.from({ length: waitingFor }).map((_, index) => (
           <div
             key={`pending-${index}`}
-            className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-white/10"
+            className="flex aspect-9/16 items-center justify-center rounded-xl border border-dashed border-white/10"
           >
             <Loader2 className="animate-spin text-white/25" size={18} />
           </div>

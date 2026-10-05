@@ -18,13 +18,11 @@ const LoadingSpinner = ({ size = 'md', message, className = '' }: LoadingSpinner
   return (
     <div className={`flex flex-col items-center justify-center gap-3 ${className}`}>
       <div
-        className={`${sizeMap[size]} animate-spin rounded-full border-[var(--color-border)] border-t-[var(--color-primary)]`}
+        className={`${sizeMap[size]} animate-spin rounded-full border-border border-t-primary`}
         role="status"
         aria-label={t('common.accessibility.loading')}
       />
-      {message && (
-        <p className="text-sm font-medium text-[var(--color-text-secondary)]">{message}</p>
-      )}
+      {message && <p className="text-sm font-medium text-text-secondary">{message}</p>}
 
       <style>{`
         @keyframes spin {

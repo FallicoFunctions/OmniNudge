@@ -13,9 +13,7 @@ export function Panel<T extends ElementType = 'div'>({
 }: PanelProps<T>) {
   const Component = as ?? 'div';
   return (
-    <Component
-      className={`rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 ${className}`}
-    >
+    <Component className={`rounded-lg border border-border bg-surface p-6 ${className}`}>
       {children}
     </Component>
   );

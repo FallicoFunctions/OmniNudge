@@ -101,20 +101,20 @@ export function MessageEditMode({
 
   // Fix 3: adjust colors when inside an own-message (primary/blue) bubble
   const textareaClass = isOwnMessage
-    ? 'w-full rounded-md border border-white/30 bg-white/15 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-none focus:ring-1 focus:ring-white/60'
-    : 'w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]';
+    ? 'w-full rounded-md border border-white/30 bg-white/15 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-hidden focus:ring-1 focus:ring-white/60'
+    : 'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary';
 
   const metaClass = isOwnMessage
     ? 'flex items-center justify-between text-xs text-white/70'
-    : 'flex items-center justify-between text-xs text-[var(--color-text-secondary)]';
+    : 'flex items-center justify-between text-xs text-text-secondary';
 
   const cancelClass = isOwnMessage
     ? 'rounded-md border border-white/30 bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20'
-    : 'rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]';
+    : 'rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)';
 
   const saveClass = isOwnMessage
-    ? 'rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-[var(--color-primary)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60'
-    : 'rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60';
+    ? 'rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-primary hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60'
+    : 'rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
@@ -145,7 +145,7 @@ export function MessageEditMode({
 
       {error && (
         <p
-          className={`text-xs font-medium ${isOwnMessage ? 'text-white/90' : 'text-[var(--color-error)]'}`}
+          className={`text-xs font-medium ${isOwnMessage ? 'text-white/90' : 'text-(--color-error)'}`}
           role="alert"
         >
           {error}

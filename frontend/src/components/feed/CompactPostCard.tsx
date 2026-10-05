@@ -403,11 +403,11 @@ export function CompactPostCard({
         ) : (
           <div
             onClick={onToggleExpand}
-            className="block hover:bg-[var(--color-hover)] transition-colors cursor-pointer"
+            className="block hover:bg-(--color-hover) transition-colors cursor-pointer"
           >
             <div className="flex items-start gap-2 p-2">
               {/* Avatar */}
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--color-background)] overflow-hidden">
+              <div className="shrink-0 w-10 h-10 rounded-full bg-background overflow-hidden">
                 {otherUser?.avatar_url ? (
                   <img
                     src={resolveMediaUrl(otherUser.avatar_url)}
@@ -416,7 +416,7 @@ export function CompactPostCard({
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[var(--color-text-muted)]">
+                  <div className="w-full h-full flex items-center justify-center text-(--color-text-muted)">
                     {(otherUser?.username?.[0] || '?').toUpperCase()}
                   </div>
                 )}
@@ -424,11 +424,11 @@ export function CompactPostCard({
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium leading-tight text-[var(--color-primary)]">
+                <h3 className="text-sm font-medium leading-tight text-primary">
                   {isModMail ? modMailTitle : otherUser?.username || t('posts.compact.unknownUser')}
                 </h3>
                 {lastMessage && lastMessage.encrypted_content && (
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">
+                  <p className="text-xs text-(--color-text-muted) mt-1 line-clamp-1">
                     <DecryptedMessagePreview
                       message={lastMessage}
                       isOwnMessage={!!isOwnMessage}
@@ -436,7 +436,7 @@ export function CompactPostCard({
                     />
                   </p>
                 )}
-                <div className="text-xs text-[var(--color-text-muted)] mt-1">
+                <div className="text-xs text-(--color-text-muted) mt-1">
                   {conversation.last_message_at &&
                     formatRelativeTime(new Date(conversation.last_message_at))}
                 </div>
@@ -444,7 +444,7 @@ export function CompactPostCard({
             </div>
           </div>
         )}
-        <div className="border-b border-[var(--color-border)]" />
+        <div className="border-b border-border" />
       </article>
     );
   }
@@ -515,7 +515,7 @@ export function CompactPostCard({
           ) : null}
 
           {/* Content below media */}
-          <div className="p-2 bg-[var(--color-surface)] flex gap-2">
+          <div className="p-2 bg-surface flex gap-2">
             {/* Left side - Text content */}
             <div
               ref={titleAreaRef}
@@ -577,7 +577,7 @@ export function CompactPostCard({
                     e.preventDefault();
                     // Upvote functionality placeholder
                   }}
-                  className="text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
+                  className="text-(--color-text-muted) hover:text-cyan-500 transition-colors"
                   aria-label={t('posts.actions.upvote')}
                 >
                   <svg
@@ -602,7 +602,7 @@ export function CompactPostCard({
                     e.preventDefault();
                     // Downvote functionality placeholder
                   }}
-                  className="text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+                  className="text-(--color-text-muted) hover:text-red-500 transition-colors"
                   aria-label={t('posts.actions.downvote')}
                 >
                   <svg
@@ -621,7 +621,7 @@ export function CompactPostCard({
           </div>
 
           {/* Bottom border only (no rounded corners) */}
-          <div className="border-b border-[var(--color-border)]" />
+          <div className="border-b border-border" />
         </>
       )}
     </article>

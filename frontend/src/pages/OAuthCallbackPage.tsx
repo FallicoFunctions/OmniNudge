@@ -44,7 +44,7 @@ export default function OAuthCallbackPage() {
         <button
           type="button"
           onClick={() => navigate('/', { replace: true })}
-          className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
         >
           Back to home
         </button>
@@ -54,7 +54,7 @@ export default function OAuthCallbackPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-[var(--color-text-secondary)]">Signing you in…</p>
+      <p className="text-sm text-text-secondary">Signing you in…</p>
     </div>
   );
 }

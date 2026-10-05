@@ -18,11 +18,10 @@ const WRONG_PASSWORD = 'Wrong password';
 const MIN_APP_PASSWORD_LENGTH = 8;
 
 const inputClass =
-  'mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]';
+  'mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary';
 const primaryButtonClass =
-  'w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50';
-const textButtonClass =
-  'w-full text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]';
+  'w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50';
+const textButtonClass = 'w-full text-sm font-medium text-primary hover:text-primary-dark';
 
 /**
  * The full-screen key step. It covers the app while this device cannot read
@@ -94,9 +93,9 @@ function KeyScreen({ children }: { children: ReactNode }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="key-step-title"
-      className="fixed inset-0 z-[120] flex overflow-y-auto bg-[var(--color-background)] p-4 outline-none"
+      className="fixed inset-0 z-120 flex overflow-y-auto bg-background p-4 outline-hidden"
     >
-      <div className="m-auto w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
+      <div className="m-auto w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-xl">
         {children}
       </div>
     </div>,
@@ -118,15 +117,12 @@ function StepHeader({
       {warning ? (
         <AlertTriangle size={24} className="text-red-500" aria-hidden="true" />
       ) : (
-        <KeyRound size={24} className="text-[var(--color-primary)]" aria-hidden="true" />
+        <KeyRound size={24} className="text-primary" aria-hidden="true" />
       )}
-      <h2
-        id="key-step-title"
-        className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]"
-      >
+      <h2 id="key-step-title" className="mt-2 text-xl font-semibold text-text-primary">
         {title}
       </h2>
-      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{intro}</p>
+      <p className="mt-1 text-sm text-text-secondary">{intro}</p>
     </div>
   );
 }
@@ -179,10 +175,7 @@ function PasswordStep() {
       <StepHeader title={t('keys.password.title')} intro={t('keys.password.intro')} />
       <ErrorMessage message={error} />
       <div>
-        <label
-          htmlFor="key-password"
-          className="block text-sm font-semibold text-[var(--color-text-primary)]"
-        >
+        <label htmlFor="key-password" className="block text-sm font-semibold text-text-primary">
           {t('keys.password.label')}
         </label>
         <input
@@ -239,7 +232,7 @@ function RecoveryStep({ hasRecoveryCopy }: { hasRecoveryCopy: boolean }) {
       <div>
         <label
           htmlFor="key-recovery-phrase"
-          className="block text-sm font-semibold text-[var(--color-text-primary)]"
+          className="block text-sm font-semibold text-text-primary"
         >
           {t('keys.recovery.label')}
         </label>
@@ -301,7 +294,7 @@ function FreshStartStep({ onBack }: { onBack?: () => void }) {
       <div>
         <label
           htmlFor="key-fresh-confirm"
-          className="block text-sm font-semibold text-[var(--color-text-primary)]"
+          className="block text-sm font-semibold text-text-primary"
         >
           {t('keys.fresh.confirmLabel', { text: FRESH_START_TEXT })}
         </label>
@@ -391,10 +384,7 @@ function AppPasswordOffer({ phrase, onSkip }: { phrase: string; onSkip: () => vo
       <StepHeader title={t('keys.app.title')} intro={t('keys.app.intro')} />
       <ErrorMessage message={error} />
       <div>
-        <label
-          htmlFor="key-app-password"
-          className="block text-sm font-semibold text-[var(--color-text-primary)]"
-        >
+        <label htmlFor="key-app-password" className="block text-sm font-semibold text-text-primary">
           {t('keys.app.label')}
         </label>
         <input
@@ -409,7 +399,7 @@ function AppPasswordOffer({ phrase, onSkip }: { phrase: string; onSkip: () => vo
       <div>
         <label
           htmlFor="key-app-password-confirm"
-          className="block text-sm font-semibold text-[var(--color-text-primary)]"
+          className="block text-sm font-semibold text-text-primary"
         >
           {t('keys.app.confirmLabel')}
         </label>

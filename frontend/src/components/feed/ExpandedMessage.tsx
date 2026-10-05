@@ -57,9 +57,7 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
     <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-2`}>
       <div
         className={`max-w-[70%] rounded-lg px-3 py-2 ${
-          isOwnMessage
-            ? 'bg-cyan-600 text-white'
-            : 'bg-[var(--color-surface)] text-[var(--color-text)]'
+          isOwnMessage ? 'bg-cyan-600 text-white' : 'bg-surface text-(--color-text)'
         }`}
       >
         {hasMedia && !mediaSrc && (
@@ -75,7 +73,7 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
               <img
                 src={mediaSrc}
                 alt={t('messages.media.fallbackText')}
-                className="max-w-full rounded cursor-pointer"
+                className="max-w-full rounded-sm cursor-pointer"
                 style={{ maxHeight: '300px' }}
                 onClick={() => window.open(mediaSrc, '_blank', 'noopener,noreferrer')}
               />
@@ -84,7 +82,7 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
               <video
                 src={mediaSrc}
                 controls
-                className="max-w-full rounded"
+                className="max-w-full rounded-sm"
                 style={{ maxHeight: '300px' }}
               />
             )}
@@ -102,9 +100,11 @@ function MessageBubble({ message, isOwnMessage, currentUserId }: MessageBubblePr
             )}
           </div>
         )}
-        {showText && <div className="text-sm whitespace-pre-wrap break-words">{decryptedText}</div>}
+        {showText && (
+          <div className="text-sm whitespace-pre-wrap wrap-break-word">{decryptedText}</div>
+        )}
         <div
-          className={`text-xs mt-1 ${isOwnMessage ? 'text-cyan-200' : 'text-[var(--color-text-muted)]'}`}
+          className={`text-xs mt-1 ${isOwnMessage ? 'text-cyan-200' : 'text-(--color-text-muted)'}`}
         >
           {formatRelativeTime(message.sent_at)}
         </div>
@@ -247,9 +247,9 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
   const otherUser = conversation.other_user;
 
   return (
-    <div className="expanded-message bg-[var(--color-surface)] h-full flex flex-col">
+    <div className="expanded-message bg-surface h-full flex flex-col">
       {/* Header with back button */}
-      <div className="sticky top-0 z-10 bg-black/70 backdrop-blur-sm p-2 border-b border-cyan-500 flex items-center gap-2">
+      <div className="sticky top-0 z-10 bg-black/70 backdrop-blur-xs p-2 border-b border-cyan-500 flex items-center gap-2">
         <button
           onClick={onCollapse}
           className="text-cyan-500 hover:text-cyan-400 text-xs flex items-center gap-1 transition-colors"
@@ -266,7 +266,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
           {t('common.back')}
         </button>
         <div className="flex items-center gap-2 flex-1">
-          <div className="w-8 h-8 rounded-full bg-[var(--color-background)] overflow-hidden flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-background overflow-hidden shrink-0">
             {otherUser?.avatar_url ? (
               <img
                 src={resolveMediaUrl(otherUser.avatar_url)}
@@ -274,12 +274,12 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-[var(--color-text-muted)]">
+              <div className="w-full h-full flex items-center justify-center text-(--color-text-muted)">
                 {(otherUser?.username?.[0] || '?').toUpperCase()}
               </div>
             )}
           </div>
-          <span className="text-sm font-medium text-[var(--color-text)]">
+          <span className="text-sm font-medium text-(--color-text)">
             {otherUser?.username || t('common.unknownUser')}
           </span>
         </div>
@@ -288,11 +288,11 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-3">
         {loadingMessages ? (
-          <div className="text-center text-sm text-[var(--color-text-muted)] py-4">
+          <div className="text-center text-sm text-(--color-text-muted) py-4">
             {t('messages.status.loadingMessages')}
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-sm text-[var(--color-text-muted)] py-4">
+          <div className="text-center text-sm text-(--color-text-muted) py-4">
             {t('messages.empty.startConversation')}
           </div>
         ) : (
@@ -322,9 +322,9 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
       </div>
 
       {/* Input area */}
-      <div className="border-t border-[var(--color-border)] p-2 bg-[var(--color-surface)]">
+      <div className="border-t border-border p-2 bg-surface">
         {selectedFile && (
-          <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-text)]">
+          <div className="mb-2 flex items-center gap-2 text-xs text-(--color-text)">
             <span>📎 {selectedFile.name}</span>
             <button
               onClick={() => setSelectedFile(null)}
@@ -345,7 +345,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingMedia || sendMessageMutation.isPending}
-            className="p-2 text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors disabled:opacity-50"
+            className="p-2 text-(--color-text-muted) hover:text-cyan-500 transition-colors disabled:opacity-50"
             title={t('messages.compose.attachSingle')}
           >
             📎
@@ -357,7 +357,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
             onKeyPress={handleKeyPress}
             placeholder={t('messages.typeMessage')}
             disabled={uploadingMedia || sendMessageMutation.isPending}
-            className="flex-1 bg-[var(--color-background)] text-[var(--color-text)] text-sm px-3 py-2 rounded border border-[var(--color-border)] focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+            className="flex-1 bg-background text-(--color-text) text-sm px-3 py-2 rounded-sm border border-border focus:outline-hidden focus:border-cyan-500 disabled:opacity-50"
           />
           <button
             onClick={handleSendMessage}
@@ -366,7 +366,7 @@ export function ExpandedMessage({ conversation, onCollapse }: ExpandedMessagePro
               uploadingMedia ||
               sendMessageMutation.isPending
             }
-            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {uploadingMedia
               ? t('messages.uploading')

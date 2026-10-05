@@ -77,15 +77,10 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
     return (
       <form onSubmit={confirm} className="space-y-4">
         <div>
-          <h2
-            id="key-step-title"
-            className="text-xl font-semibold text-[var(--color-text-primary)]"
-          >
+          <h2 id="key-step-title" className="text-xl font-semibold text-text-primary">
             {t('keys.phrase.confirmTitle')}
           </h2>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            {t('keys.phrase.confirmIntro')}
-          </p>
+          <p className="mt-1 text-sm text-text-secondary">{t('keys.phrase.confirmIntro')}</p>
         </div>
 
         {error && (
@@ -98,7 +93,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
           <div key={position}>
             <label
               htmlFor={`phrase-word-${position}`}
-              className="block text-sm font-semibold text-[var(--color-text-primary)]"
+              className="block text-sm font-semibold text-text-primary"
             >
               {t('keys.phrase.confirmLabel', { number: position + 1 })}
             </label>
@@ -110,7 +105,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
               onChange={(e) =>
                 setAnswers((current) => current.map((a, j) => (j === i ? e.target.value : a)))
               }
-              className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
               autoCapitalize="none"
               autoCorrect="off"
               autoComplete="off"
@@ -121,7 +116,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
 
         <button
           type="submit"
-          className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
         >
           {t('keys.phrase.confirm')}
         </button>
@@ -131,7 +126,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
             setError('');
             setConfirming(false);
           }}
-          className="w-full text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+          className="w-full text-sm font-medium text-primary hover:text-primary-dark"
         >
           {t('keys.phrase.back')}
         </button>
@@ -142,24 +137,21 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
   return (
     <div className="space-y-4">
       <div>
-        <KeyRound size={24} className="text-[var(--color-primary)]" aria-hidden="true" />
-        <h2
-          id="key-step-title"
-          className="mt-2 text-xl font-semibold text-[var(--color-text-primary)]"
-        >
+        <KeyRound size={24} className="text-primary" aria-hidden="true" />
+        <h2 id="key-step-title" className="mt-2 text-xl font-semibold text-text-primary">
           {t('keys.phrase.title')}
         </h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{t('keys.phrase.intro')}</p>
+        <p className="mt-1 text-sm text-text-secondary">{t('keys.phrase.intro')}</p>
       </div>
 
       <ol className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {words.map((word, i) => (
           <li
             key={i}
-            className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm"
+            className="rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm"
           >
-            <span className="mr-2 text-[var(--color-text-muted)]">{i + 1}</span>
-            <span className="font-semibold text-[var(--color-text-primary)]">{word}</span>
+            <span className="mr-2 text-(--color-text-muted)">{i + 1}</span>
+            <span className="font-semibold text-text-primary">{word}</span>
           </li>
         ))}
       </ol>
@@ -168,7 +160,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
         <button
           type="button"
           onClick={() => void copy()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+          className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-4 py-2 text-sm font-semibold text-text-primary hover:bg-border"
         >
           {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
           {copied ? t('keys.phrase.copied') : t('keys.phrase.copy')}
@@ -176,7 +168,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
         <button
           type="button"
           onClick={download}
-          className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+          className="flex flex-1 items-center justify-center gap-2 rounded-md border border-border bg-(--color-surface-elevated) px-4 py-2 text-sm font-semibold text-text-primary hover:bg-border"
         >
           <Download size={16} aria-hidden="true" />
           {t('keys.phrase.download')}
@@ -186,7 +178,7 @@ export function RecoveryPhraseStep({ phrase, onDone }: RecoveryPhraseStepProps) 
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
       >
         {t('keys.phrase.saved')}
       </button>

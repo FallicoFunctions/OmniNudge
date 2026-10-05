@@ -24,14 +24,12 @@ export function FormField({
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Label: 14px (text-sm), semibold (font-semibold) */}
-      <label className="block text-sm font-semibold text-[var(--color-text-primary)]">
+      <label className="block text-sm font-semibold text-text-primary">
         {label}
         {required ? (
           <span className="text-red-500 ml-1">*</span>
         ) : (
-          <span className="text-[var(--color-text-secondary)] font-normal ml-1">
-            {t('common.optional')}
-          </span>
+          <span className="text-text-secondary font-normal ml-1">{t('common.optional')}</span>
         )}
       </label>
 
@@ -42,7 +40,7 @@ export function FormField({
       {error ? (
         <p className="text-xs text-red-600">{error}</p>
       ) : helperText ? (
-        <p className="text-xs text-[var(--color-text-secondary)]">{helperText}</p>
+        <p className="text-xs text-text-secondary">{helperText}</p>
       ) : null}
     </div>
   );

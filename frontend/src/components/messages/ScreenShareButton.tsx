@@ -37,25 +37,25 @@ export function ScreenShareButton({
         disabled={isDisabled}
         aria-label={isSharing ? t('calls.stopSharing') : t('calls.shareScreen')}
         aria-pressed={isSharing}
-        className={`flex items-center justify-center w-14 h-14 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-40 disabled:cursor-not-allowed ${
+        className={`flex items-center justify-center w-14 h-14 rounded-full transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40 disabled:cursor-not-allowed ${
           isSharing
-            ? 'bg-[var(--color-error)] hover:opacity-90'
-            : 'bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)]'
+            ? 'bg-(--color-error) hover:opacity-90'
+            : 'bg-(--color-surface-2) hover:bg-(--color-surface-3)'
         }`}
       >
         {isSharing ? (
           <MonitorOff className="w-6 h-6 text-white" />
         ) : (
-          <Monitor className="w-6 h-6 text-[var(--color-text-primary)]" />
+          <Monitor className="w-6 h-6 text-text-primary" />
         )}
         {isSharing && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--color-error)] animate-pulse" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-(--color-error) animate-pulse" />
         )}
       </button>
 
       {/* Peer sharing indicator */}
       {peerIsSharing && !isSharing && (
-        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--color-primary)]" />
+        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-primary" />
       )}
     </div>
   );

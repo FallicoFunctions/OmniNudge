@@ -96,7 +96,7 @@ export function ScreenShareView({
           <button
             onClick={onStopSharing}
             aria-label={t('calls.stopSharing')}
-            className="flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-full bg-[var(--color-error)] text-white font-semibold text-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
+            className="flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-full bg-(--color-error) text-white font-semibold text-sm transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--color-error)"
           >
             <MonitorOff className="w-4 h-4" />
             {t('calls.stopSharing')}

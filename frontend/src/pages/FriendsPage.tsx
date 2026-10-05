@@ -172,14 +172,12 @@ export default function FriendsPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-          {t('friends.title')}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('friends.subtitle')}</p>
+        <h1 className="text-3xl font-bold text-text-primary">{t('friends.title')}</h1>
+        <p className="mt-2 text-sm text-text-secondary">{t('friends.subtitle')}</p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-1 border-b border-[var(--color-border)]">
+      <div className="mb-4 flex gap-1 border-b border-border">
         {tabs.map(({ key, labelKey, badge, badgePlain }) => (
           <button
             key={key}
@@ -187,8 +185,8 @@ export default function FriendsPage() {
             onClick={() => setTab(key)}
             className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold transition-colors ${
               tab === key
-                ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             {t(labelKey)}
@@ -197,7 +195,7 @@ export default function FriendsPage() {
               (badgePlain ? (
                 <span className="text-xs font-bold">{badge}</span>
               ) : (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-white">
                   {badge}
                 </span>
               ))}
@@ -214,17 +212,15 @@ export default function FriendsPage() {
             <ErrorMessage>{t('friends.errors.loadFailed')}</ErrorMessage>
           ) : !friendsQuery.data?.length ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-[var(--color-text-secondary)]">{t('friends.empty')}</p>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                {t('friends.emptyHint')}
-              </p>
+              <p className="text-sm text-text-secondary">{t('friends.empty')}</p>
+              <p className="mt-1 text-xs text-(--color-text-muted)">{t('friends.emptyHint')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               {friendsQuery.data.map((friend) => (
                 <article
                   key={friend.id}
-                  className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-md border border-border bg-(--color-surface-elevated) p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-3">
                     {friend.avatar_url ? (
@@ -234,18 +230,18 @@ export default function FriendsPage() {
                         className="h-10 w-10 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white">
                         {friend.username[0].toUpperCase()}
                       </div>
                     )}
                     <div>
                       <Link
                         to={`/users/${friend.username}`}
-                        className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                        className="text-base font-semibold text-text-primary hover:text-primary"
                       >
                         {friend.username}
                       </Link>
-                      <p className="text-xs text-[var(--color-text-secondary)]">
+                      <p className="text-xs text-text-secondary">
                         {t('friends.friendsSince', {
                           date: formatDate(friend.friends_since, {
                             month: 'short',
@@ -263,7 +259,7 @@ export default function FriendsPage() {
                       removeFriendMutation.variables === friend.username
                     }
                     onClick={() => removeFriendMutation.mutate(friend.username)}
-                    className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
+                    className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:border-(--color-error) hover:text-(--color-error) disabled:opacity-50"
                   >
                     {t('friends.actions.unfriend')}
                   </button>
@@ -283,16 +279,14 @@ export default function FriendsPage() {
             <ErrorMessage>{t('friends.errors.loadFailed')}</ErrorMessage>
           ) : !requestsQuery.data?.incoming?.length ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {t('friends.incoming.empty')}
-              </p>
+              <p className="text-sm text-text-secondary">{t('friends.incoming.empty')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               {requestsQuery.data.incoming.map((req) => (
                 <article
                   key={req.id}
-                  className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-md border border-border bg-(--color-surface-elevated) p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-3">
                     {req.avatar_url ? (
@@ -302,18 +296,18 @@ export default function FriendsPage() {
                         className="h-10 w-10 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white">
                         {req.username[0].toUpperCase()}
                       </div>
                     )}
                     <div>
                       <Link
                         to={`/users/${req.username}`}
-                        className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                        className="text-base font-semibold text-text-primary hover:text-primary"
                       >
                         {req.username}
                       </Link>
-                      <p className="text-xs text-[var(--color-text-secondary)]">
+                      <p className="text-xs text-text-secondary">
                         {t('friends.incoming.sentAt', {
                           date: formatDate(req.sent_at, {
                             month: 'short',
@@ -329,7 +323,7 @@ export default function FriendsPage() {
                       type="button"
                       disabled={acceptMutation.isPending}
                       onClick={() => acceptMutation.mutate(req.username)}
-                      className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
                     >
                       {t('friends.actions.accept')}
                     </button>
@@ -345,7 +339,7 @@ export default function FriendsPage() {
                           direction: 'incoming',
                         })
                       }
-                      className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
+                      className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:border-(--color-error) hover:text-(--color-error) disabled:opacity-50"
                     >
                       {t('friends.actions.decline')}
                     </button>
@@ -366,16 +360,14 @@ export default function FriendsPage() {
             <ErrorMessage>{t('friends.errors.loadFailed')}</ErrorMessage>
           ) : !requestsQuery.data?.outgoing?.length ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                {t('friends.outgoing.empty')}
-              </p>
+              <p className="text-sm text-text-secondary">{t('friends.outgoing.empty')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               {requestsQuery.data.outgoing.map((req) => (
                 <article
                   key={req.id}
-                  className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-md border border-border bg-(--color-surface-elevated) p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-3">
                     {req.avatar_url ? (
@@ -385,18 +377,18 @@ export default function FriendsPage() {
                         className="h-10 w-10 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary)] text-sm font-bold text-white">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-white">
                         {req.username[0].toUpperCase()}
                       </div>
                     )}
                     <div>
                       <Link
                         to={`/users/${req.username}`}
-                        className="text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                        className="text-base font-semibold text-text-primary hover:text-primary"
                       >
                         {req.username}
                       </Link>
-                      <p className="text-xs text-[var(--color-text-secondary)]">
+                      <p className="text-xs text-text-secondary">
                         {t('friends.outgoing.sentAt', {
                           date: formatDate(req.sent_at, {
                             month: 'short',
@@ -419,7 +411,7 @@ export default function FriendsPage() {
                         direction: 'outgoing',
                       })
                     }
-                    className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:border-[var(--color-error)] hover:text-[var(--color-error)] disabled:opacity-50"
+                    className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-secondary hover:border-(--color-error) hover:text-(--color-error) disabled:opacity-50"
                   >
                     {t('friends.actions.cancelRequest')}
                   </button>

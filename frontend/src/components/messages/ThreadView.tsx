@@ -139,18 +139,18 @@ export function ThreadView({
       className={`fixed inset-0 z-50 flex bg-black/50 ${isMobile ? 'items-center justify-center p-4' : 'items-stretch justify-end p-0'}`}
     >
       <div
-        className={`flex flex-col overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl ${
+        className={`flex flex-col overflow-hidden border border-border bg-surface shadow-2xl ${
           isMobile
             ? 'h-[80vh] w-full max-w-3xl rounded-xl'
             : 'h-full w-full max-w-[320px] rounded-none border-l'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-sm font-semibold text-text-primary">
               {t('messages.threadView.title')}
             </h3>
-            <p className="text-xs text-[var(--color-text-muted)]">
+            <p className="text-xs text-(--color-text-muted)">
               {t('messages.threadView.replyCount', { count: replyCount })}
             </p>
           </div>
@@ -160,7 +160,7 @@ export function ThreadView({
                 type="button"
                 onClick={() => void handleToggleMute()}
                 disabled={mutePending}
-                className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] disabled:opacity-60"
+                className="rounded-md px-2 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) hover:text-text-primary disabled:opacity-60"
               >
                 {mutePending
                   ? muted
@@ -180,7 +180,7 @@ export function ThreadView({
                     block: 'center',
                   })
                 }
-                className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+                className="rounded-md px-2 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) hover:text-text-primary"
               >
                 {t('messages.threadView.jumpToRoot')}
               </button>
@@ -188,7 +188,7 @@ export function ThreadView({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-2 py-1 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)]"
+              className="rounded-md px-2 py-1 text-sm font-medium text-text-secondary hover:bg-(--color-surface-elevated) hover:text-text-primary"
               aria-label={t('messages.threadView.closeAria')}
             >
               {t('common.close')}
@@ -198,7 +198,7 @@ export function ThreadView({
 
         <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="text-sm text-[var(--color-text-secondary)]">{t('common.loading')}</div>
+            <div className="text-sm text-text-secondary">{t('common.loading')}</div>
           ) : error ? (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
@@ -222,11 +222,11 @@ export function ThreadView({
                     }
                     className={`rounded-lg border px-3 py-2 ${
                       isRoot
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                        : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)]'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border bg-(--color-surface-elevated)'
                     }`}
                   >
-                    <div className="mb-1 flex items-center justify-between gap-3 text-xs text-[var(--color-text-muted)]">
+                    <div className="mb-1 flex items-center justify-between gap-3 text-xs text-(--color-text-muted)">
                       <span>
                         {isRoot
                           ? t('messages.threadView.rootMessage')
@@ -236,9 +236,9 @@ export function ThreadView({
                       </span>
                       <span>{formatTimestamp(message.sent_at)}</span>
                     </div>
-                    <div className="text-sm text-[var(--color-text-primary)]">
+                    <div className="text-sm text-text-primary">
                       {isRoot && message.deleted_for_sender && message.deleted_for_recipient ? (
-                        <span className="italic text-[var(--color-text-muted)]">
+                        <span className="italic text-(--color-text-muted)">
                           {t('messages.threadView.deletedRoot')}
                         </span>
                       ) : (
@@ -258,7 +258,7 @@ export function ThreadView({
                                 block: 'center',
                               });
                           }}
-                          className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                          className="text-[10px] font-semibold uppercase tracking-wide text-(--color-text-muted) hover:text-text-primary"
                         >
                           {t('messages.threadView.jumpToReply')}
                         </button>
@@ -269,21 +269,19 @@ export function ThreadView({
               })}
 
               {!loading && orderedItems.length === 0 && (
-                <div className="text-sm text-[var(--color-text-secondary)]">
-                  {t('messages.threadView.empty')}
-                </div>
+                <div className="text-sm text-text-secondary">{t('messages.threadView.empty')}</div>
               )}
             </div>
           )}
         </div>
 
         {hasMore && !loading && (
-          <div className="border-t border-[var(--color-border)] px-4 py-3">
+          <div className="border-t border-border px-4 py-3">
             <button
               type="button"
               onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-60"
+              className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated) disabled:opacity-60"
             >
               {loadingMore ? t('common.loading') : t('messages.threadView.loadMore')}
             </button>
@@ -293,7 +291,7 @@ export function ThreadView({
         {onSubmitReply && rootMessage && (
           <form
             onSubmit={(event) => void handleReplySubmit(event)}
-            className="border-t border-[var(--color-border)] px-4 py-3"
+            className="border-t border-border px-4 py-3"
           >
             <div className="flex items-center gap-2">
               <input
@@ -301,12 +299,12 @@ export function ThreadView({
                 value={replyText}
                 onChange={(event) => setReplyText(event.target.value)}
                 placeholder={t('messages.threadView.replyPlaceholder')}
-                className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="flex-1 rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
               />
               <button
                 type="submit"
                 disabled={replySubmitting || !replyText.trim()}
-                className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-60"
+                className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
               >
                 {replySubmitting ? t('common.loading') : t('messages.threadView.sendReply')}
               </button>

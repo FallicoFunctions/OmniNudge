@@ -354,7 +354,7 @@ export function RedditPostSlideshow({
             )}
 
             {post.mediaType === 'text' && post.selftext && (
-              <div className="bg-[var(--color-surface)] rounded-lg p-6 max-w-3xl max-h-[70vh] overflow-auto">
+              <div className="bg-surface rounded-lg p-6 max-w-3xl max-h-[70vh] overflow-auto">
                 <PostBodyMarkdown content={post.selftext} />
               </div>
             )}
@@ -373,7 +373,7 @@ export function RedditPostSlideshow({
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-hover)] transition-colors"
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-(--color-primary-hover) transition-colors"
           >
             {t('common.close')}
           </button>
@@ -391,7 +391,7 @@ export function RedditPostSlideshow({
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-hover)] transition-colors"
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-(--color-primary-hover) transition-colors"
           >
             {t('common.close')}
           </button>

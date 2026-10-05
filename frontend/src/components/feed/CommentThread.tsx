@@ -179,12 +179,10 @@ export function CommentThread({
             )}
 
             {/* Comment content */}
-            <div className="border-b border-[var(--color-border)] p-1">
+            <div className="border-b border-border p-1">
               {/* Metadata */}
-              <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)]">
-                <span className="font-semibold text-[var(--color-primary)]">
-                  {comment.username}
-                </span>
+              <div className="flex items-center gap-1.5 text-[10px] text-(--color-text-muted)">
+                <span className="font-semibold text-primary">{comment.username}</span>
                 <span>•</span>
                 <span>{pointsLabel}</span>
                 <span>•</span>
@@ -192,10 +190,7 @@ export function CommentThread({
               </div>
 
               {/* Comment body */}
-              <MarkdownRenderer
-                content={comment.content}
-                className="mt-1 text-xs text-[var(--color-primary)]"
-              />
+              <MarkdownRenderer content={comment.content} className="mt-1 text-xs text-primary" />
 
               {/* Actions */}
               <div className="flex items-center gap-2 mt-1">
@@ -210,14 +205,14 @@ export function CommentThread({
                 )}
                 <button
                   onClick={() => handleReplyClick(comment.id)}
-                  className="text-[10px] text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors"
+                  className="text-[10px] text-(--color-text-muted) hover:text-cyan-500 transition-colors"
                 >
                   {t('comments.actions.reply')}
                 </button>
                 <button
                   onClick={() => handleSaveComment(comment)}
                   disabled={savingComments.has(comment.id)}
-                  className="text-[10px] text-[var(--color-text-muted)] hover:text-cyan-500 transition-colors disabled:opacity-50"
+                  className="text-[10px] text-(--color-text-muted) hover:text-cyan-500 transition-colors disabled:opacity-50"
                 >
                   {savingComments.has(comment.id)
                     ? t('comments.status.saving')

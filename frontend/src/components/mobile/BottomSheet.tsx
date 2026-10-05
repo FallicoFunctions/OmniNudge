@@ -108,7 +108,7 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
         ref={sheetRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        className="fixed bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto bg-[var(--color-surface)] rounded-t-2xl shadow-xl animate-slide-up"
+        className="fixed bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto bg-surface rounded-t-2xl shadow-xl animate-slide-up"
         style={{
           zIndex: MOBILE_Z_INDEX.BOTTOM_SHEET,
           paddingBottom: 'env(safe-area-inset-bottom)',
@@ -119,17 +119,14 @@ export function BottomSheet({ isOpen, onClose, children, title }: BottomSheetPro
       >
         {/* Header */}
         {title && (
-          <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-            <h2
-              id="bottom-sheet-title"
-              className="text-lg font-semibold text-[var(--color-text-primary)]"
-            >
+          <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-surface border-b border-border">
+            <h2 id="bottom-sheet-title" className="text-lg font-semibold text-text-primary">
               {title}
             </h2>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg active:bg-[var(--color-hover)] transition-colors"
+              className="p-2 rounded-lg active:bg-(--color-hover) transition-colors"
               aria-label={t('ariaLabels.closeMenu')}
             >
               <X size={24} />

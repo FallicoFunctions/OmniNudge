@@ -113,15 +113,13 @@ export default function SubscribedView({
   const content = (
     <div className={className}>
       {showHeading && (
-        <h2 className="mb-4 text-2xl font-bold text-[var(--color-text-primary)]">
-          {t('subscriptions.title')}
-        </h2>
+        <h2 className="mb-4 text-2xl font-bold text-text-primary">{t('subscriptions.title')}</h2>
       )}
 
       {isLoading ? (
         <LoadingMessage className="text-sm">{t('subscriptions.loading')}</LoadingMessage>
       ) : hasError ? (
-        <ErrorMessage className="text-sm text-[var(--color-error)]">
+        <ErrorMessage className="text-sm text-(--color-error)">
           {t('subscriptions.loadFailed')}
         </ErrorMessage>
       ) : allHubs.length === 0 && allSubreddits.length === 0 ? (
@@ -136,13 +134,13 @@ export default function SubscribedView({
                 placeholder={t('subscriptions.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
               />
             </div>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="px-4 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
             >
               <option value="alphabetical">{t('subscriptions.sort.alphabetical')}</option>
               <option value="recent">{t('subscriptions.sort.recent')}</option>
@@ -151,7 +149,7 @@ export default function SubscribedView({
 
           {/* Results summary */}
           {searchQuery && (
-            <div className="mb-4 text-sm text-[var(--color-text-secondary)]">
+            <div className="mb-4 text-sm text-text-secondary">
               {t('subscriptions.searchResults', {
                 subscriptionCount: hubs.length + subreddits.length,
                 query: searchQuery,
@@ -162,7 +160,7 @@ export default function SubscribedView({
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Hubs Column */}
             <section>
-              <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-3 text-lg font-semibold text-text-primary">
                 {t('subscriptions.hubsTitle', { count: hubs.length })}
               </h3>
               {hubs.length === 0 ? (
@@ -179,20 +177,16 @@ export default function SubscribedView({
                     return (
                       <article
                         key={subscription.id}
-                        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+                        className="rounded-md border border-border bg-surface p-4"
                       >
                         <Link
                           to={`/h/${hubName}`}
-                          className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
+                          className="text-lg font-semibold text-primary hover:underline"
                         >
                           {t('common.format.hubPath', { name: hubName })}
                         </Link>
-                        {hubTitle && (
-                          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                            {hubTitle}
-                          </p>
-                        )}
-                        <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                        {hubTitle && <p className="mt-1 text-sm text-text-secondary">{hubTitle}</p>}
+                        <p className="mt-2 text-xs text-text-secondary">
                           {t('subscriptions.subscribedAt', {
                             time: formatSubscribedAt(subscription.subscribed_at),
                           })}
@@ -206,7 +200,7 @@ export default function SubscribedView({
 
             {/* Subreddits Column */}
             <section>
-              <h3 className="mb-3 text-lg font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-3 text-lg font-semibold text-text-primary">
                 {t('subscriptions.subredditsTitle', { count: subreddits.length })}
               </h3>
               {subreddits.length === 0 ? (
@@ -216,15 +210,15 @@ export default function SubscribedView({
                   {subreddits.map((subscription) => (
                     <article
                       key={subscription.id}
-                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+                      className="rounded-md border border-border bg-surface p-4"
                     >
                       <Link
                         to={`/r/${subscription.subreddit_name}`}
-                        className="text-lg font-semibold text-[var(--color-primary)] hover:underline"
+                        className="text-lg font-semibold text-primary hover:underline"
                       >
                         {t('common.format.subredditPath', { name: subscription.subreddit_name })}
                       </Link>
-                      <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                      <p className="mt-2 text-xs text-text-secondary">
                         {t('subscriptions.subscribedAt', {
                           time: formatSubscribedAt(subscription.subscribed_at),
                         })}
@@ -246,9 +240,7 @@ export default function SubscribedView({
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8">
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-        {content}
-      </div>
+      <div className="rounded-lg border border-border bg-surface p-6">{content}</div>
     </div>
   );
 }

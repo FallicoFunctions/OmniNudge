@@ -24,23 +24,21 @@ export function CombinedSuggestionItem({
           type="button"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => onSelectHub(hub.name)}
-          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-(--color-surface-elevated)"
         >
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)] text-[10px] font-semibold text-white">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary text-[10px] font-semibold text-white">
             {t('common.prefix.hub')}
           </div>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+            <span className="truncate text-sm font-medium text-text-primary">
               {t('common.format.hubPath', { name: hub.name })}
             </span>
             {hub.title && (
-              <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-                {hub.title}
-              </span>
+              <span className="truncate text-[11px] text-text-secondary">{hub.title}</span>
             )}
           </div>
           {typeof hub.subscriber_count === 'number' && hub.subscriber_count > 0 && (
-            <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+            <span className="ml-auto text-[11px] text-text-secondary">
               {formatNumber(hub.subscriber_count)} {t('common.units.subscribersShort')}
             </span>
           )}
@@ -56,7 +54,7 @@ export function CombinedSuggestionItem({
         type="button"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => onSelectSubreddit(subreddit.name)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--color-surface-elevated)]"
+        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-(--color-surface-elevated)"
       >
         {subreddit.icon_url ? (
           <img
@@ -64,25 +62,23 @@ export function CombinedSuggestionItem({
             alt=""
             loading="lazy"
             decoding="async"
-            className="h-6 w-6 flex-shrink-0 rounded-md object-cover"
+            className="h-6 w-6 shrink-0 rounded-md object-cover"
           />
         ) : (
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[var(--color-border)] text-[10px] font-semibold text-[var(--color-text-secondary)]">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-border text-[10px] font-semibold text-text-secondary">
             {t('common.prefix.subreddit')}
           </div>
         )}
         <div className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+          <span className="truncate text-sm font-medium text-text-primary">
             {t('common.format.subredditPath', { name: subreddit.name })}
           </span>
           {subreddit.title && (
-            <span className="truncate text-[11px] text-[var(--color-text-secondary)]">
-              {subreddit.title}
-            </span>
+            <span className="truncate text-[11px] text-text-secondary">{subreddit.title}</span>
           )}
         </div>
         {typeof subreddit.subscribers === 'number' && subreddit.subscribers > 0 && (
-          <span className="ml-auto text-[11px] text-[var(--color-text-secondary)]">
+          <span className="ml-auto text-[11px] text-text-secondary">
             {formatNumber(subreddit.subscribers)} {t('common.units.subscribersShort')}
           </span>
         )}

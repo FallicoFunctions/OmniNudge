@@ -95,7 +95,7 @@ export default function OmniChatResponseFeedbackTab() {
   }
   if (feedbackQuery.isError) {
     return (
-      <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">
+      <p role="alert" className="rounded-sm border border-red-300 bg-red-50 p-4 text-red-800">
         {t('adminPage.responseFeedback.loadError')}
       </p>
     );
@@ -110,7 +110,7 @@ export default function OmniChatResponseFeedbackTab() {
         <h2 id="response-feedback-heading" className="text-2xl font-bold">
           {t('adminPage.responseFeedback.title')}
         </h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        <p className="mt-1 text-sm text-text-secondary">
           {t('adminPage.responseFeedback.subtitle')}
         </p>
       </div>
@@ -124,7 +124,7 @@ export default function OmniChatResponseFeedbackTab() {
               setStatus(event.target.value as AdminOmniChatResponseFeedbackStatus | '');
               resetSelection();
             }}
-            className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2"
+            className="ml-2 rounded-sm border border-border bg-surface p-2"
           >
             <option value="">{t('adminPage.responseFeedback.allStatuses')}</option>
             {STATUSES.map((value) => (
@@ -142,7 +142,7 @@ export default function OmniChatResponseFeedbackTab() {
               setReason(event.target.value as OmniChatResponseFeedbackReason | '');
               resetSelection();
             }}
-            className="ml-2 rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2"
+            className="ml-2 rounded-sm border border-border bg-surface p-2"
           >
             <option value="">{t('adminPage.responseFeedback.allReasons')}</option>
             {REASONS.map((value) => (
@@ -154,19 +154,19 @@ export default function OmniChatResponseFeedbackTab() {
         </label>
       </div>
 
-      <p className="text-sm text-[var(--color-text-secondary)]">
+      <p className="text-sm text-text-secondary">
         {t('adminPage.responseFeedback.count', { count: total })}
       </p>
 
       {items.length === 0 ? (
-        <p className="rounded border border-[var(--color-border)] p-5 text-[var(--color-text-secondary)]">
+        <p className="rounded-sm border border-border p-5 text-text-secondary">
           {t('adminPage.responseFeedback.empty')}
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.8fr)]">
-          <div className="overflow-x-auto rounded border border-[var(--color-border)]">
+          <div className="overflow-x-auto rounded-sm border border-border">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--color-surface-secondary)]">
+              <thead className="bg-(--color-surface-secondary)">
                 <tr>
                   <th className="p-3">{t('adminPage.responseFeedback.reason')}</th>
                   <th className="p-3">{t('adminPage.responseFeedback.status')}</th>
@@ -175,7 +175,7 @@ export default function OmniChatResponseFeedbackTab() {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="border-t border-[var(--color-border)]">
+                  <tr key={item.id} className="border-t border-border">
                     <td className="p-3">
                       <button
                         type="button"
@@ -183,7 +183,7 @@ export default function OmniChatResponseFeedbackTab() {
                           setSelectedId(item.id);
                           statusMutation.reset();
                         }}
-                        className="text-left font-medium text-[var(--color-primary)] underline-offset-2 hover:underline"
+                        className="text-left font-medium text-primary underline-offset-2 hover:underline"
                       >
                         {t(`adminPage.responseFeedback.reasons.${item.reason}`)}
                       </button>
@@ -202,7 +202,10 @@ export default function OmniChatResponseFeedbackTab() {
             (detailQuery.isLoading ? (
               <LoadingMessage>{t('adminPage.responseFeedback.loading')}</LoadingMessage>
             ) : detailQuery.isError ? (
-              <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">
+              <p
+                role="alert"
+                className="rounded-sm border border-red-300 bg-red-50 p-4 text-red-800"
+              >
                 {t('adminPage.responseFeedback.loadError')}
               </p>
             ) : (
@@ -225,7 +228,7 @@ export default function OmniChatResponseFeedbackTab() {
         onPrev={() => setOffset((value) => Math.max(0, value - PAGE_SIZE))}
         onNext={() => setOffset((value) => value + PAGE_SIZE)}
         centerContent={
-          <span className="text-sm text-[var(--color-text-secondary)]">
+          <span className="text-sm text-text-secondary">
             {t('adminPage.responseFeedback.page', {
               page: Math.floor(offset / PAGE_SIZE) + 1,
             })}
@@ -250,7 +253,7 @@ function FeedbackDetail({ feedback, isPending, error, onStatus }: FeedbackDetail
   return (
     <aside
       aria-label={t('adminPage.responseFeedback.detail')}
-      className="rounded border border-[var(--color-border)] p-4 text-sm"
+      className="rounded-sm border border-border p-4 text-sm"
     >
       <h3 className="font-semibold">{t('adminPage.responseFeedback.detail')}</h3>
       <dl className="mt-3 space-y-2">
@@ -289,7 +292,7 @@ function FeedbackDetail({ feedback, isPending, error, onStatus }: FeedbackDetail
               key={nextStatus}
               disabled={isPending}
               onClick={() => onStatus(nextStatus)}
-              className="rounded bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {t(`adminPage.responseFeedback.statuses.${nextStatus}`)}
             </button>
@@ -311,7 +314,7 @@ function Snapshot({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="font-medium">{label}</dt>
       <dd>
-        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-[var(--color-surface-secondary)] p-2 text-xs">
+        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-sm bg-(--color-surface-secondary) p-2 text-xs">
           {value || t('adminPage.responseFeedback.unavailable')}
         </pre>
       </dd>

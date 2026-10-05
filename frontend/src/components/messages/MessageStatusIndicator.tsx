@@ -14,7 +14,7 @@ export function MessageStatusIndicator({ message, isSending }: MessageStatusIndi
   if (isSending) {
     return (
       <span
-        className="inline-flex items-center text-xs text-[var(--color-text-muted)]"
+        className="inline-flex items-center text-xs text-(--color-text-muted)"
         title={t('messages.deliveryStatus.sending')}
       >
         <Clock className="h-3 w-3" />
@@ -38,7 +38,7 @@ export function MessageStatusIndicator({ message, isSending }: MessageStatusIndi
   if (message.delivered_at) {
     return (
       <span
-        className="inline-flex items-center text-xs text-[var(--color-text-muted)]"
+        className="inline-flex items-center text-xs text-(--color-text-muted)"
         title={t('messages.deliveryStatus.delivered')}
       >
         <CheckCheck className="h-3 w-3" />
@@ -49,7 +49,7 @@ export function MessageStatusIndicator({ message, isSending }: MessageStatusIndi
   // Message has been sent but not delivered
   return (
     <span
-      className="inline-flex items-center text-xs text-[var(--color-text-muted)]"
+      className="inline-flex items-center text-xs text-(--color-text-muted)"
       title={t('messages.deliveryStatus.sent')}
     >
       <Check className="h-3 w-3" />

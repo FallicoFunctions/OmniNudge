@@ -117,7 +117,7 @@ export function BaseSlideshow({
       {/* MSG-3: Improved lightbox header with clearer counter */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
         {/* Media counter - left */}
-        <div className="text-white text-base font-semibold bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+        <div className="text-white text-base font-semibold bg-black/60 backdrop-blur-xs px-4 py-2 rounded-lg">
           {t('slideshow.counter.imageOf', {
             current: formatNumber(currentIndex + 1),
             total: formatNumber(items.length),
@@ -141,7 +141,7 @@ export function BaseSlideshow({
         {/* Close button - right */}
         <button
           onClick={onClose}
-          className="bg-black/60 backdrop-blur-sm hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
+          className="bg-black/60 backdrop-blur-xs hover:bg-red-600/80 text-white transition-colors p-2 rounded-lg"
           aria-label={t('slideshow.aria.closeEsc')}
         >
           <svg
@@ -168,7 +168,7 @@ export function BaseSlideshow({
             e.stopPropagation();
             handlePrevious();
           }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
+          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-xs hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
           aria-label={t('slideshow.aria.previous')}
         >
           <svg
@@ -203,7 +203,7 @@ export function BaseSlideshow({
             e.stopPropagation();
             handleNext();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-sm hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
+          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-xs hover:bg-white/20 text-white transition-colors z-10 p-3 rounded-full"
           aria-label={t('slideshow.aria.next')}
         >
           <svg

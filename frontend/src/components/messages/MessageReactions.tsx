@@ -70,7 +70,7 @@ export function MessageReactions({
         {[1, 2].map((i) => (
           <div
             key={i}
-            className="h-6 w-12 animate-pulse rounded-full bg-[var(--color-surface-elevated)]"
+            className="h-6 w-12 animate-pulse rounded-full bg-(--color-surface-elevated)"
           />
         ))}
       </div>
@@ -107,13 +107,13 @@ export function MessageReactions({
               className={[
                 'flex items-center gap-1 rounded-full border px-2 py-0.5',
                 'text-xs font-medium transition-colors select-none',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]',
+                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
                 isActive
-                  ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                  : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)]',
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-(--color-surface-elevated) text-text-secondary',
                 isBusy || !canToggle
                   ? 'cursor-not-allowed opacity-60'
-                  : 'cursor-pointer hover:border-[var(--color-primary)]/50 hover:bg-[var(--color-primary)]/5 active:scale-95',
+                  : 'cursor-pointer hover:border-primary/50 hover:bg-primary/5 active:scale-95',
               ].join(' ')}
               onClick={() => {
                 if (isMobile) {
@@ -158,7 +158,7 @@ export function MessageReactions({
       {/* Mutation error — shown briefly when add/remove fails (auto-cleared on retry) */}
       {hasError && (
         <span
-          className="self-center text-[10px] text-[var(--color-error)]"
+          className="self-center text-[10px] text-(--color-error)"
           role="alert"
           aria-live="assertive"
         >
@@ -182,14 +182,14 @@ export function MessageReactions({
             className="absolute inset-0 bg-black/40"
             onClick={() => setMobileDetails(null)}
           />
-          <div className="relative z-10 w-full rounded-t-2xl bg-[var(--color-surface)] p-4 shadow-xl">
+          <div className="relative z-10 w-full rounded-t-2xl bg-surface p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-sm font-semibold text-text-primary">
                 {mobileDetails.emoji} {mobileDetails.count}
               </h3>
               <button
                 type="button"
-                className="rounded-md px-2 py-1 text-xs font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-md px-2 py-1 text-xs font-medium text-text-secondary hover:bg-(--color-surface-elevated)"
                 onClick={() => setMobileDetails(null)}
               >
                 {t('common.close')}
@@ -199,7 +199,7 @@ export function MessageReactions({
             <button
               type="button"
               disabled={isBusy}
-              className="mb-3 w-full rounded-md border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] disabled:opacity-60"
+              className="mb-3 w-full rounded-md border border-border px-3 py-2 text-sm font-medium text-text-primary disabled:opacity-60"
               onClick={() => {
                 toggleReaction(mobileDetails);
                 setMobileDetails(null);
@@ -210,20 +210,20 @@ export function MessageReactions({
                 : t('messages.reactions.reactWithThisEmoji')}
             </button>
 
-            <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--color-border)]">
+            <div className="max-h-48 overflow-y-auto rounded-md border border-border">
               {mobileDetails.usernames.length > 0 ? (
-                <ul className="divide-y divide-[var(--color-border)]">
+                <ul className="divide-y divide-border">
                   {mobileDetails.usernames.map((username, index) => (
                     <li
                       key={`${username}-${index}`}
-                      className="px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                      className="px-3 py-2 text-sm text-text-primary"
                     >
                       {username}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+                <p className="px-3 py-2 text-sm text-text-secondary">
                   {t('messages.reactions.noUserNamesAvailable')}
                 </p>
               )}

@@ -11,7 +11,7 @@ const sceneGlb = path.join(rootDir, 'public/assets/venues/main-stage/main-stage.
 const collisionGlb = path.join(rootDir, 'public/assets/venues/main-stage/main-stage-collision.glb');
 const textureDir = path.join(rootDir, 'assets-src/main-stage/textures/subtle');
 const finalizeExports = process.argv.includes('--finalize-exports');
-const gltfTransformCli = path.join(rootDir, 'node_modules/@gltf-transform/cli/bin/cli.js');
+const gltfTransformCli = path.join(rootDir, 'scripts/transform-asset.mjs');
 
 const ensureJpegtran = () => {
   const probe = spawnSync('jpegtran', ['-version'], { encoding: 'utf8' });
@@ -138,12 +138,6 @@ const compressRuntimeGlb = async () => {
       'draco',
       validationGlb,
       sceneGlb,
-      '--method',
-      'edgebreaker',
-      '--encode-speed',
-      '4',
-      '--decode-speed',
-      '6',
     ],
     { encoding: 'utf8' },
   );

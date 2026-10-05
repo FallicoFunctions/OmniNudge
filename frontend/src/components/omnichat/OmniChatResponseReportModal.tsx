@@ -102,7 +102,7 @@ export default function OmniChatResponseReportModal({
               {REASONS.map((option) => (
                 <label
                   key={option}
-                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-3 text-sm text-white/75 transition hover:border-[#5d8fff]/60 hover:bg-[#315ca8]/10 has-[:checked]:border-[#5d8fff] has-[:checked]:bg-[#315ca8]/15"
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-3 text-sm text-white/75 transition hover:border-[#5d8fff]/60 hover:bg-[#315ca8]/10 has-checked:border-[#5d8fff] has-checked:bg-[#315ca8]/15"
                 >
                   <input
                     type="radio"
@@ -129,7 +129,7 @@ export default function OmniChatResponseReportModal({
             maxLength={1000}
             rows={3}
             placeholder={t('omnichat.responseReport.notePlaceholder')}
-            className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[#5d8fff] focus:outline-none focus:ring-2 focus:ring-[#5d8fff]/40 disabled:opacity-50"
+            className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-[#5d8fff] focus:outline-hidden focus:ring-2 focus:ring-[#5d8fff]/40 disabled:opacity-50"
           />
           {error && (
             <p role="alert" className="mt-3 text-sm text-red-300">
@@ -150,7 +150,7 @@ export default function OmniChatResponseReportModal({
           <button
             type="submit"
             disabled={!reason || isSubmitting}
-            className="omnichat-touch-target rounded-full bg-[#426fc4] px-5 text-sm font-semibold text-white transition hover:bg-[#527fd3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7da8ff] disabled:cursor-not-allowed disabled:opacity-40"
+            className="omnichat-touch-target rounded-full bg-[#426fc4] px-5 text-sm font-semibold text-white transition hover:bg-[#527fd3] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7da8ff] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting
               ? t('omnichat.responseReport.sending')

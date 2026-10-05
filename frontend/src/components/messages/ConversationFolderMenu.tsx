@@ -31,8 +31,8 @@ export function ConversationFolderMenu({
 
   if (isLoading) {
     return (
-      <div className="border-b border-[var(--color-border)] pb-1">
-        <p className="px-3 py-1.5 text-xs text-[var(--color-text-muted)]">
+      <div className="border-b border-border pb-1">
+        <p className="px-3 py-1.5 text-xs text-(--color-text-muted)">
           {t('messages.folders.loading')}
         </p>
       </div>
@@ -65,8 +65,8 @@ export function ConversationFolderMenu({
   };
 
   return (
-    <div className="border-b border-[var(--color-border)] pb-1" aria-busy={pendingId !== null}>
-      <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+    <div className="border-b border-border pb-1" aria-busy={pendingId !== null}>
+      <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">
         {t('messages.folders.title')}
       </p>
       {folders.map((folder) => {
@@ -79,17 +79,17 @@ export function ConversationFolderMenu({
               type="button"
               onClick={() => void handleToggle(folder)}
               disabled={isPending || pendingId !== null}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-primary)] disabled:opacity-60"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-text-primary hover:bg-(--color-hover) focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:opacity-60"
               aria-pressed={inFolder}
             >
               {/* Checkbox */}
               <span
-                className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                   isPending
-                    ? 'border-[var(--color-border)] opacity-50'
+                    ? 'border-border opacity-50'
                     : inFolder
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]'
-                      : 'border-[var(--color-border)]'
+                      ? 'border-primary bg-primary'
+                      : 'border-border'
                 }`}
                 aria-hidden
               >
@@ -118,7 +118,7 @@ export function ConversationFolderMenu({
                 ) : null}
               </span>
               <span
-                className="inline-flex flex-shrink-0 items-center text-base leading-none"
+                className="inline-flex shrink-0 items-center text-base leading-none"
                 aria-hidden
               >
                 {folder.icon}
@@ -127,14 +127,14 @@ export function ConversationFolderMenu({
             </button>
             {hasError && (
               <div className="flex items-center justify-between px-3 pb-1">
-                <p role="alert" className="text-xs text-[var(--color-error)]">
+                <p role="alert" className="text-xs text-(--color-error)">
                   {t('messages.folders.toggleError')}
                 </p>
                 <button
                   type="button"
                   onClick={() => void handleToggle(folder)}
                   aria-label={`${t('messages.folders.retry')}: ${folder.name}`}
-                  className="text-xs font-semibold text-[var(--color-primary)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:rounded"
+                  className="text-xs font-semibold text-primary hover:underline focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:rounded-sm"
                 >
                   {t('messages.folders.retry')}
                 </button>

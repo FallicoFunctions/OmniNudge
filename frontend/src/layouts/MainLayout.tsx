@@ -229,18 +229,18 @@ export default function MainLayout() {
   }, [isOmniChatRoute]);
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)]">
+    <div className="min-h-screen bg-background">
       {/* Skip to main content link for keyboard navigation */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[70] focus:rounded-md focus:bg-[var(--color-primary)] focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-70 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-white focus:shadow-lg focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2"
       >
         {t('mainLayout.skipToMainContent')}
       </a>
 
       {/* Navigation Bar */}
       <nav
-        className={`sticky top-0 z-50 border-b border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200${hideNav ? ' hidden' : ''}`}
+        className={`sticky top-0 z-50 border-b border-border bg-surface transition-all duration-200${hideNav ? ' hidden' : ''}`}
         style={{ height: isSlimMode ? '36px' : '64px' }}
       >
         <div className="mx-auto max-w-7xl px-4 h-full">
@@ -249,7 +249,7 @@ export default function MainLayout() {
               {/* Logo */}
               <Link
                 to="/"
-                className={`font-bold text-[var(--color-primary)] transition-all duration-200 ${isSlimMode ? 'text-base' : 'text-xl'}`}
+                className={`font-bold text-primary transition-all duration-200 ${isSlimMode ? 'text-base' : 'text-xl'}`}
               >
                 {isSlimMode ? t('common.brandNameShort') : t('common.brandName')}
               </Link>
@@ -269,11 +269,11 @@ export default function MainLayout() {
                         }
                       }}
                       onMouseEnter={() => prefetchRoutes.messages()}
-                      className="relative rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      className="relative rounded-md px-3 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                     >
                       {t('nav.messages')}
                       {messagesBadge > 0 && (
-                        <span className="absolute -right-2 -top-1 rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-xs text-white">
+                        <span className="absolute -right-2 -top-1 rounded-full bg-primary px-2 py-0.5 text-xs text-white">
                           {messagesBadge}
                         </span>
                       )}
@@ -282,14 +282,14 @@ export default function MainLayout() {
                       type="button"
                       onClick={() => navigate('/hubs')}
                       onMouseEnter={() => prefetchRoutes.hubs()}
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      className="rounded-md px-3 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                     >
                       {t('menu.hubs')}
                     </button>
                     <Link
                       to="/games"
                       onMouseEnter={() => prefetchRoutes.games()}
-                      className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                      className="rounded-md px-3 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                     >
                       {t('nav.games')}
                     </Link>
@@ -298,7 +298,7 @@ export default function MainLayout() {
                         type="button"
                         onClick={() => navigate('/omnichat')}
                         onMouseEnter={() => prefetchRoutes.omnichat()}
-                        className="rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+                        className="rounded-md px-3 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated)"
                       >
                         {t('nav.omnichat')}
                       </button>
@@ -306,7 +306,7 @@ export default function MainLayout() {
                   </div>
 
                   {/* Divider */}
-                  <div className="hidden lg:block h-6 w-px bg-[var(--color-border)]" />
+                  <div className="hidden lg:block h-6 w-px bg-border" />
                 </>
               )}
 
@@ -373,7 +373,7 @@ export default function MainLayout() {
                               {
                                 label: 'Upgrade to Paid',
                                 onClick: () => setShowUpgradeModal(true),
-                                className: 'text-[var(--color-primary)] font-semibold',
+                                className: 'text-primary font-semibold',
                               },
                             ]
                           : []),
@@ -471,14 +471,14 @@ export default function MainLayout() {
                       />
 
                       {/* Divider */}
-                      <div className="h-6 w-px bg-[var(--color-border)]" />
+                      <div className="h-6 w-px bg-border" />
                     </>
                   )}
 
                   <button
                     type="button"
                     onClick={() => setAuthModal('login')}
-                    className={`rounded-md ${isSlimMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]`}
+                    className={`rounded-md ${isSlimMode ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} font-medium text-text-primary hover:bg-(--color-surface-elevated)`}
                   >
                     {t('common.login')}
                   </button>
@@ -486,7 +486,7 @@ export default function MainLayout() {
                     <button
                       type="button"
                       onClick={() => setAuthModal('signup')}
-                      className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+                      className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
                     >
                       {t('auth.registerTitle')}
                     </button>
@@ -511,8 +511,7 @@ export default function MainLayout() {
                         {
                           label: t('auth.registerTitle'),
                           onClick: () => setAuthModal('signup'),
-                          className:
-                            'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)]',
+                          className: 'bg-primary text-white hover:bg-primary-dark',
                         },
                       ]}
                     />
@@ -574,8 +573,8 @@ export default function MainLayout() {
           isOpen
           onClose={dismissAboutModal}
           ariaLabelledBy="welcome-title"
-          layerClassName="z-[60]"
-          className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xl sm:p-6"
+          layerClassName="z-60"
+          className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-lg border border-border bg-surface p-4 shadow-xl sm:p-6"
         >
           <div className="min-h-0 overflow-y-auto pr-2">
             <Suspense
@@ -588,8 +587,8 @@ export default function MainLayout() {
               <AboutContent variant="welcome" onNavigate={dismissAboutModal} />
             </Suspense>
           </div>
-          <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+          <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
               <input
                 type="checkbox"
                 checked={dontShowAgain}
@@ -601,7 +600,7 @@ export default function MainLayout() {
             <button
               type="button"
               onClick={dismissAboutModal}
-              className="rounded-md bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
             >
               {t('common.continue')}
             </button>

@@ -11,10 +11,10 @@ export function ThreadPreview({ replyCount, onOpenThread }: ThreadPreviewProps) 
   if (replyCount <= 0) return null;
 
   const content = (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+    <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-text-secondary">
       <span>{t('messages.threadPreview.replyCount', { count: replyCount })}</span>
       {onOpenThread && (
-        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
+        <span className="text-[10px] uppercase tracking-wide text-(--color-text-muted)">
           {t('messages.threadPreview.viewThread')}
         </span>
       )}
@@ -29,7 +29,7 @@ export function ThreadPreview({ replyCount, onOpenThread }: ThreadPreviewProps) 
     <button
       type="button"
       onClick={onOpenThread}
-      className="mt-1 inline-flex items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+      className="mt-1 inline-flex items-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
       aria-label={t('messages.threadPreview.openAria')}
     >
       {content}

@@ -146,11 +146,11 @@ export function MessageEditHistory({
     >
       <div
         data-modal
-        className="flex w-full max-w-md flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
+        className="flex w-full max-w-md flex-col rounded-xl border border-border bg-surface shadow-xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <h2 id={titleId} className="text-sm font-semibold text-[var(--color-text-primary)]">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h2 id={titleId} className="text-sm font-semibold text-text-primary">
             {t('messages.editHistory.title')}
           </h2>
           <button
@@ -158,7 +158,7 @@ export function MessageEditHistory({
             type="button"
             onClick={onClose}
             aria-label={t('common.close')}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
               <path
@@ -175,15 +175,13 @@ export function MessageEditHistory({
         {/* Fix 19: min-h-[120px] prevents collapsing too small with few entries */}
         <div className="min-h-[120px] max-h-[60vh] overflow-y-auto p-4">
           {isLoading ? (
-            <p className="text-center text-sm text-[var(--color-text-muted)]">
-              {t('common.loading')}
-            </p>
+            <p className="text-center text-sm text-(--color-text-muted)">{t('common.loading')}</p>
           ) : isError ? (
-            <p className="text-center text-sm text-[var(--color-error)]">
+            <p className="text-center text-sm text-(--color-error)">
               {t('messages.editHistory.loadError')}
             </p>
           ) : entries.length === 0 ? (
-            <p className="text-center text-sm text-[var(--color-text-muted)]">
+            <p className="text-center text-sm text-(--color-text-muted)">
               {t('messages.editHistory.noHistory')}
             </p>
           ) : (
@@ -192,12 +190,12 @@ export function MessageEditHistory({
                   all versions including the latest, not just pre-edit snapshots */}
               {currentContent !== undefined && (
                 <li className="flex flex-col gap-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-primary)]">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">
                     {t('messages.editHistory.current')}
                   </span>
-                  <p className="rounded-md bg-[var(--color-primary)]/8 px-3 py-2 text-sm text-[var(--color-text-primary)]">
+                  <p className="rounded-md bg-primary/8 px-3 py-2 text-sm text-text-primary">
                     {currentContent || (
-                      <em className="text-[var(--color-text-muted)]">
+                      <em className="text-(--color-text-muted)">
                         {t('messages.editHistory.decrypting')}
                       </em>
                     )}
@@ -213,26 +211,23 @@ export function MessageEditHistory({
                     : t('messages.editHistory.version', { n: index });
                 return (
                   <li key={entry.id} className="flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-(--color-text-muted)">
                       {label}
                     </span>
-                    <p className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)]">
+                    <p className="rounded-md bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary">
                       {text === '\x00' ? (
-                        <em className="text-[var(--color-text-muted)]">
+                        <em className="text-(--color-text-muted)">
                           {t('messages.editHistory.cannotDecrypt')}
                         </em>
                       ) : text !== '…' ? (
                         text
                       ) : (
-                        <em className="text-[var(--color-text-muted)]">
+                        <em className="text-(--color-text-muted)">
                           {t('messages.editHistory.decrypting')}
                         </em>
                       )}
                     </p>
-                    <time
-                      dateTime={entry.edited_at}
-                      className="text-xs text-[var(--color-text-muted)]"
-                    >
+                    <time dateTime={entry.edited_at} className="text-xs text-(--color-text-muted)">
                       {formatDate(entry.edited_at, {
                         month: 'short',
                         day: 'numeric',

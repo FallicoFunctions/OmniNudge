@@ -1,19 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import postcss from 'postcss';
-import tailwindcss from 'tailwindcss';
-import tailwindConfig from '../../../../tailwind.config.js';
+import tailwindcss from '@tailwindcss/postcss';
 import OmniChatSidebar from '../OmniChatSidebar';
 
-async function generateUtilityCss(rawMarkup: string) {
-  const result = await postcss([
-    tailwindcss({
-      ...tailwindConfig,
-      content: [{ raw: rawMarkup, extension: 'html' }],
-    }),
-  ]).process('@tailwind utilities;', { from: undefined });
-
-  return result.css;
+async function generateUtilityCss(token: string) {
+  const from = resolve('src/index.css');
+  const stylesheet = readFileSync(from, 'utf8').replace(/^@source .*;\n/gm, '');
+  return postcss([tailwindcss({ optimize: false })]).process(
+    `${stylesheet}\n@source inline(${JSON.stringify(token)});`,
+    { from }
+  );
 }
 
 async function hasGeneratedBaseTextColor(className: string) {
@@ -22,16 +21,26 @@ async function hasGeneratedBaseTextColor(className: string) {
     .filter((token) => token.startsWith('text-') && !token.includes(':'));
 
   for (const token of baseTextTokens) {
-    const css = await generateUtilityCss(`<button class="${token}"></button>`);
-    if (css.includes('color:')) {
-      return true;
-    }
+    const css = await generateUtilityCss(token);
+    const selector = `.${token.replace(/[^a-zA-Z0-9_-]/g, '\\$&')}`;
+    let hasColor = false;
+    css.root.walkRules(selector, (rule) => {
+      rule.walkDecls('color', () => {
+        hasColor = true;
+      });
+    });
+    if (hasColor) return true;
   }
 
   return false;
 }
 
 describe('OmniChatSidebar color utilities', () => {
+  it('requires a color declaration on the requested utility, not another stylesheet rule', async () => {
+    expect(await hasGeneratedBaseTextColor('text-not-a-real-color')).toBe(false);
+    expect(await hasGeneratedBaseTextColor('text-text-primary')).toBe(true);
+  });
+
   it('renders inactive navigation labels with a generated base text color utility', async () => {
     render(
       <OmniChatSidebar

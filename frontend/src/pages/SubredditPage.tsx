@@ -1175,7 +1175,7 @@ export default function RedditPage() {
             onPostSubmit={handlePostSearchSubmit}
             postDropdownOpen={isSearchDropdownOpen}
             postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+              <div className="space-y-2 text-sm text-text-primary">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1195,9 +1195,7 @@ export default function RedditPage() {
                   </label>
                 )}
                 {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    {t('home.search.nsfwBlocked')}
-                  </div>
+                  <div className="text-xs text-text-secondary">{t('home.search.nsfwBlocked')}</div>
                 )}
               </div>
             }
@@ -1213,8 +1211,8 @@ export default function RedditPage() {
                     onClick={() => setSort(sortOption)}
                     className={`px-4 py-2 text-sm font-semibold ${
                       sort === sortOption
-                        ? 'text-[var(--color-primary)]'
-                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                        ? 'text-primary'
+                        : 'text-text-secondary hover:text-text-primary'
                     }`}
                   >
                     {t(`home.sort.${sortOption}`)}
@@ -1223,7 +1221,7 @@ export default function RedditPage() {
                 {hasWiki && (
                   <Link
                     to={`/r/${subreddit}/wiki/index`}
-                    className="px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    className="px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
                   >
                     {t('hubPage.controls.wiki')}
                   </Link>
@@ -1231,7 +1229,7 @@ export default function RedditPage() {
                 {visiblePosts.length > 0 && (
                   <button
                     onClick={() => setSlideshowOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -1248,8 +1246,8 @@ export default function RedditPage() {
             }
             right={
               <>
-                <div className="flex items-center gap-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm">
-                  <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+                <div className="flex items-center gap-3 rounded-full border border-border bg-(--color-surface-elevated) px-3 py-1 text-sm">
+                  <span className="text-xs font-semibold uppercase text-text-secondary">
                     {t('home.filter.omniOnly')}
                   </span>
                   <button
@@ -1257,8 +1255,8 @@ export default function RedditPage() {
                     role="switch"
                     aria-checked={showOmniOnly}
                     onClick={() => setShowOmniOnly((prev) => !prev)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-1 ${
-                      showOmniOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 ${
+                      showOmniOnly ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">{t('home.filter.omniOnly')}</span>
@@ -1305,7 +1303,7 @@ export default function RedditPage() {
                     onPostSubmit={handlePostSearchSubmit}
                     postDropdownOpen={isSearchDropdownOpen}
                     postDropdownContent={
-                      <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                      <div className="space-y-2 text-sm text-text-primary">
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -1325,7 +1323,7 @@ export default function RedditPage() {
                           </label>
                         )}
                         {blockAllNsfw && (
-                          <div className="text-xs text-[var(--color-text-secondary)]">
+                          <div className="text-xs text-text-secondary">
                             {t('home.search.nsfwBlocked')}
                           </div>
                         )}
@@ -1344,13 +1342,13 @@ export default function RedditPage() {
         <div className="mb-4 mt-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase text-[var(--color-text-secondary)]">
+              <span className="text-xs font-semibold uppercase text-text-secondary">
                 {t('home.timeRange.label')}
               </span>
               <select
                 value={topTimeRange}
                 onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-3 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
               >
                 {TOP_TIME_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1365,19 +1363,17 @@ export default function RedditPage() {
                   type="datetime-local"
                   value={customTopStart}
                   onChange={(event) => setCustomTopStart(event.target.value)}
-                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
                 />
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  {t('home.timeRange.to')}
-                </span>
+                <span className="text-xs text-text-secondary">{t('home.timeRange.to')}</span>
                 <input
                   type="datetime-local"
                   value={customTopEnd}
                   onChange={(event) => setCustomTopEnd(event.target.value)}
-                  className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
                 />
                 {!isCustomRangeValid && (
-                  <span className="text-xs text-[var(--color-error)]">
+                  <span className="text-xs text-(--color-error)">
                     {t('home.timeRange.selectBothDates')}
                   </span>
                 )}
@@ -1432,7 +1428,7 @@ export default function RedditPage() {
                   onPrev={() => {}}
                   onNext={() => fetchScopedSearchPage(scopedSearchPage + 1, scopedSearchAfter)}
                   centerContent={
-                    <span className="text-sm text-[var(--color-text-secondary)]">
+                    <span className="text-sm text-text-secondary">
                       {t('searchPage.pagination.page', { page: scopedSearchPage })}
                     </span>
                   }
@@ -1491,7 +1487,7 @@ export default function RedditPage() {
                 onPrev={handlePrevPage}
                 onNext={handleNextPage}
                 centerContent={
-                  <span className="text-sm text-[var(--color-text-secondary)]">
+                  <span className="text-sm text-text-secondary">
                     {t('searchPage.pagination.page', { page: currentPage })}
                   </span>
                 }
@@ -1515,23 +1511,19 @@ export default function RedditPage() {
       {hideTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.hide.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              {t('modals.hide.description')}
-            </p>
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.hide.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">{t('modals.hide.description')}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setHideTarget(null)}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmHide}
                 disabled={isHidePending}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {isHidePending ? t('modals.hide.hiding') : t('modals.hide.hideButton')}
               </button>

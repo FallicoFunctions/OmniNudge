@@ -293,10 +293,8 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-          {t('settings.title')}
-        </h1>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{t('settings.subtitle')}</p>
+        <h1 className="text-3xl font-bold text-text-primary">{t('settings.title')}</h1>
+        <p className="mt-2 text-sm text-text-secondary">{t('settings.subtitle')}</p>
       </div>
 
       <div className="mb-8 flex flex-wrap gap-2" role="tablist" aria-label={t('settings.title')}>
@@ -309,8 +307,8 @@ export default function SettingsPage() {
             onClick={() => setActiveTab(tab.key)}
             className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === tab.key
-                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:border-[var(--color-primary)]'
+                ? 'border-primary bg-primary text-white'
+                : 'border-border bg-(--color-surface-elevated) text-text-primary hover:border-primary'
             }`}
           >
             {tab.label}
@@ -321,42 +319,39 @@ export default function SettingsPage() {
       <div className="space-y-8">
         <div hidden={activeTab !== 'appearance'}>
           {/* SETTINGS-5: Category header for Appearance */}
-          <div className="border-b border-[var(--color-border)] pb-2">
-            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          <div className="border-b border-border pb-2">
+            <h2 className="text-2xl font-bold text-text-primary">
               {t('settings.categories.appearance')}
             </h2>
           </div>
 
           {/* Theme Selection */}
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.themeSection.title')}
             </h3>
-            <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+            <p className="mb-4 text-sm text-text-secondary">
               {t('settings.themeSection.description')}
             </p>
             <ThemeSelector onCreateNewTheme={() => setIsThemeEditorOpen(true)} />
           </Panel>
 
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.appearancePreferences.fontSizeTitle')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.appearancePreferences.fontSizeHelp')}
             </p>
-            <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-              <label
-                htmlFor="font-size"
-                className="block text-sm font-semibold text-[var(--color-text-primary)]"
-              >
+            <div className="mt-4 rounded-md border border-border bg-(--color-surface-elevated) p-4">
+              <label htmlFor="font-size" className="block text-sm font-semibold text-text-primary">
                 {t('settings.appearancePreferences.fontSizeLabel')}
               </label>
               <select
                 id="font-size"
                 value={fontSize}
                 onChange={(e) => setFontSize(e.target.value as 'small' | 'medium' | 'large')}
-                className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
               >
                 <option value="small">{t('settings.appearancePreferences.fontSizeSmall')}</option>
                 <option value="medium">{t('settings.appearancePreferences.fontSizeMedium')}</option>
@@ -373,12 +368,10 @@ export default function SettingsPage() {
           </Panel>
           {import.meta.env.DEV && (
             <Panel as="section">
-              <h3 className="mb-2 text-base font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-2 text-base font-semibold text-text-primary">
                 {t('settings.devRtl.title')}
               </h3>
-              <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
-                {t('settings.devRtl.description')}
-              </p>
+              <p className="mb-3 text-xs text-text-secondary">{t('settings.devRtl.description')}</p>
               <div className="flex flex-wrap gap-2">
                 {(['auto', 'ltr', 'rtl'] as const).map((value) => (
                   <button
@@ -387,8 +380,8 @@ export default function SettingsPage() {
                     onClick={() => setDevDirectionOverride(value)}
                     className={`rounded border px-3 py-1 text-xs font-semibold ${
                       devDirectionOverride === value
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                        : 'border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]'
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-border bg-(--color-surface-elevated) text-text-primary'
                     }`}
                   >
                     {t(`settings.devRtl.options.${value}`)}
@@ -401,27 +394,27 @@ export default function SettingsPage() {
 
         <div hidden={activeTab !== 'notifications'}>
           {/* SETTINGS-5: Category header for Notifications */}
-          <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          <div className="border-b border-border pb-2 pt-4">
+            <h2 className="text-2xl font-bold text-text-primary">
               {t('settings.categories.notifications')}
             </h2>
           </div>
 
           {/* Messaging Notifications */}
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.archivedNotifications.title')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.archivedNotifications.description')}
             </p>
 
-            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
               <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                <p className="text-base font-semibold text-text-primary">
                   {t('settings.archivedNotifications.toggleLabel')}
                 </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.archivedNotifications.toggleHelp')}
                 </p>
               </div>
@@ -430,8 +423,8 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={notifyArchivedMessages}
                 onClick={() => setNotifyArchivedMessages(!notifyArchivedMessages)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  notifyArchivedMessages ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                  notifyArchivedMessages ? 'bg-primary' : 'bg-gray-300'
                 }`}
               >
                 <span className="sr-only">
@@ -449,10 +442,10 @@ export default function SettingsPage() {
 
           {/* Push Notifications */}
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.pushNotificationsSection.title')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.pushNotificationsSection.description')}
             </p>
 
@@ -465,12 +458,12 @@ export default function SettingsPage() {
             )}
 
             {pushSupported && (
-              <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.pushNotificationsSection.toggleLabel')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {showPushNotifications
                       ? t('settings.pushNotificationsSection.toggleHelpOn')
                       : t('settings.pushNotificationsSection.toggleHelpOff')}
@@ -483,8 +476,8 @@ export default function SettingsPage() {
                   onClick={() => {
                     void handleTogglePushNotifications();
                   }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    showPushNotifications ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    showPushNotifications ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">
@@ -502,19 +495,17 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.quietHours.title')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.quietHours.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.quietHours.description')}</p>
 
-            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
               <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                <p className="text-base font-semibold text-text-primary">
                   {t('settings.quietHours.toggle')}
                 </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.quietHours.timezone', { tz: quietHoursTimezone })}
                 </p>
               </div>
@@ -523,8 +514,8 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={quietHoursEnabled}
                 onClick={() => setQuietHoursEnabled(!quietHoursEnabled)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  quietHoursEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                  quietHoursEnabled ? 'bg-primary' : 'bg-gray-300'
                 }`}
               >
                 <span className="sr-only">{t('settings.quietHours.toggle')}</span>
@@ -540,10 +531,10 @@ export default function SettingsPage() {
             <div
               className={`mt-4 grid gap-4 sm:grid-cols-2 ${quietHoursEnabled ? '' : 'opacity-60'}`}
             >
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="quiet-hours-start"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-text-primary"
                 >
                   {t('settings.quietHours.start')}
                 </label>
@@ -553,13 +544,13 @@ export default function SettingsPage() {
                   value={minutesToTimeValue(quietHoursStartMinutes)}
                   disabled={!quietHoursEnabled}
                   onChange={(e) => setQuietHoursStartMinutes(timeValueToMinutes(e.target.value))}
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 />
               </div>
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="quiet-hours-end"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-text-primary"
                 >
                   {t('settings.quietHours.end')}
                 </label>
@@ -569,17 +560,17 @@ export default function SettingsPage() {
                   value={minutesToTimeValue(quietHoursEndMinutes)}
                   disabled={!quietHoursEnabled}
                   onChange={(e) => setQuietHoursEndMinutes(timeValueToMinutes(e.target.value))}
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
           </Panel>
 
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.notificationPreferences.title')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.notificationPreferences.description')}
             </p>
 
@@ -637,21 +628,19 @@ export default function SettingsPage() {
               ].map((item) => (
                 <div
                   key={item.key}
-                  className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4"
+                  className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4"
                 >
                   <div className="pr-4">
-                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                      {item.label}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{item.help}</p>
+                    <p className="text-base font-semibold text-text-primary">{item.label}</p>
+                    <p className="mt-1 text-sm text-text-secondary">{item.help}</p>
                   </div>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={item.value}
                     onClick={item.onToggle}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      item.value ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      item.value ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">{item.label}</span>
@@ -671,21 +660,21 @@ export default function SettingsPage() {
         {/* Messaging Settings */}
         <div hidden={activeTab !== 'privacy'}>
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.messagingPrivacy.title')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.messagingPrivacy.description')}
             </p>
 
             <div className="mt-4 space-y-4">
               {/* Read Receipts Toggle */}
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.messagingPrivacy.readReceipts')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.messagingPrivacy.readReceiptsHelp')}
                   </p>
                 </div>
@@ -694,8 +683,8 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={readReceipts}
                   onClick={() => setReadReceipts(!readReceipts)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    readReceipts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    readReceipts ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleReadReceipts')}</span>
@@ -709,12 +698,12 @@ export default function SettingsPage() {
               </div>
 
               {/* Typing Indicators Toggle */}
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.messagingPrivacy.typingIndicators')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.messagingPrivacy.typingIndicatorsHelp')}
                   </p>
                 </div>
@@ -723,8 +712,8 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={typingIndicators}
                   onClick={() => setTypingIndicators(!typingIndicators)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    typingIndicators ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    typingIndicators ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">
@@ -739,12 +728,12 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.messagingPrivacy.autoUnarchiveOnMessage')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.messagingPrivacy.autoUnarchiveOnMessageHelp')}
                   </p>
                 </div>
@@ -753,8 +742,8 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={autoUnarchiveOnMessage}
                   onClick={() => setAutoUnarchiveOnMessage(!autoUnarchiveOnMessage)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    autoUnarchiveOnMessage ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    autoUnarchiveOnMessage ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">
@@ -770,12 +759,12 @@ export default function SettingsPage() {
               </div>
 
               {/* Notification Sound Toggle */}
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.messagingPrivacy.notificationSound')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.messagingPrivacy.notificationSoundHelp')}
                   </p>
                 </div>
@@ -784,8 +773,8 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={notificationSound}
                   onClick={() => setNotificationSound(!notificationSound)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    notificationSound ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    notificationSound ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">
@@ -801,12 +790,12 @@ export default function SettingsPage() {
               </div>
 
               {/* Last Seen Toggle */}
-              <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.messagingPrivacy.lastSeen')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.messagingPrivacy.lastSeenHelp')}
                   </p>
                 </div>
@@ -815,8 +804,8 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={showLastSeen}
                   onClick={() => setShowLastSeen(!showLastSeen)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    showLastSeen ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    showLastSeen ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">{t('common.accessibility.toggleLastSeen')}</span>
@@ -829,21 +818,21 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="profile-visibility"
-                  className="block text-base font-semibold text-[var(--color-text-primary)]"
+                  className="block text-base font-semibold text-text-primary"
                 >
                   {t('settings.messagingPrivacy.profileVisibility')}
                 </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.messagingPrivacy.profileVisibilityHelp')}
                 </p>
                 <select
                   id="profile-visibility"
                   value={profileVisibility}
                   onChange={(e) => setProfileVisibility(e.target.value as 'public' | 'private')}
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="public">
                     {t('settings.messagingPrivacy.profileVisibilityPublic')}
@@ -854,14 +843,14 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="wall-post-permission"
-                  className="block text-base font-semibold text-[var(--color-text-primary)]"
+                  className="block text-base font-semibold text-text-primary"
                 >
                   {t('settings.messagingPrivacy.wallPostPermission')}
                 </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.messagingPrivacy.wallPostPermissionHelp')}
                 </p>
                 <select
@@ -872,7 +861,7 @@ export default function SettingsPage() {
                       e.target.value as 'all_friends' | 'requires_approval' | 'no_one'
                     )
                   }
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="all_friends">
                     {t('settings.messagingPrivacy.wallPostPermissionAllFriends')}
@@ -887,11 +876,11 @@ export default function SettingsPage() {
               </div>
 
               {/* Global Auto-Delete */}
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
+                <p className="text-base font-semibold text-text-primary">
                   {t('messages.autoDelete.label')}
                 </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)] mb-4">
+                <p className="mt-1 text-sm text-text-secondary mb-4">
                   {t('messages.autoDelete.description')}
                 </p>
                 <AutoDeleteDurationPicker
@@ -903,7 +892,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={handleGlobalAutoDeleteSave}
                   disabled={!globalIsDirty || saveGlobalAutoDeleteMutation.isPending}
-                  className="mt-4 w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
+                  className="mt-4 w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40"
                 >
                   {t('common.save')}
                 </button>
@@ -915,11 +904,11 @@ export default function SettingsPage() {
         {/* Global auto-delete retroactive confirm */}
         {pendingGlobalSeconds !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
-              <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-2">
+            <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-2xl">
+              <h3 className="text-base font-semibold text-text-primary mb-2">
                 {t('messages.autoDelete.applyRetroTitle')}
               </h3>
-              <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+              <p className="text-sm text-text-secondary mb-6">
                 {t('messages.autoDelete.applyRetroBody')}
               </p>
               <div className="flex flex-col gap-2">
@@ -932,7 +921,7 @@ export default function SettingsPage() {
                     })
                   }
                   disabled={saveGlobalAutoDeleteMutation.isPending}
-                  className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
                 >
                   {t('messages.autoDelete.applyToAll')}
                 </button>
@@ -945,14 +934,14 @@ export default function SettingsPage() {
                     })
                   }
                   disabled={saveGlobalAutoDeleteMutation.isPending}
-                  className="w-full rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+                  className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-(--color-hover)"
                 >
                   {t('messages.autoDelete.applyNewOnly')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPendingGlobalSeconds(null)}
-                  className="w-full rounded-md px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
+                  className="w-full rounded-md px-4 py-2 text-sm text-(--color-text-muted) hover:bg-(--color-hover)"
                 >
                   {t('common.cancel')}
                 </button>
@@ -963,15 +952,15 @@ export default function SettingsPage() {
 
         <div hidden={activeTab !== 'general'}>
           {/* SETTINGS-5: Category header for Preferences */}
-          <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          <div className="border-b border-border pb-2 pt-4">
+            <h2 className="text-2xl font-bold text-text-primary">
               {t('settings.categories.preferences')}
             </h2>
           </div>
 
           {/* Date & Time Settings */}
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.dateTime.title')}
             </h3>
 
@@ -980,18 +969,18 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <label
                     htmlFor="relative-time-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.dateTime.useRelativeTime')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.dateTime.useRelativeTimeHelp')}
                   </p>
-                  <div className="mt-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-                    <div className="text-xs text-[var(--color-text-secondary)]">
+                  <div className="mt-2 rounded-md border border-border bg-(--color-surface-elevated) p-3">
+                    <div className="text-xs text-text-secondary">
                       <strong>{t('settings.dateTime.previewLabel')}</strong>
                     </div>
-                    <div className="mt-1 text-sm text-[var(--color-text-primary)]">
+                    <div className="mt-1 text-sm text-text-primary">
                       {useRelativeTime
                         ? t('settings.dateTime.relativePreview')
                         : t('settings.dateTime.absolutePreview')}
@@ -1006,8 +995,8 @@ export default function SettingsPage() {
                     role="switch"
                     aria-checked={useRelativeTime}
                     onClick={() => setUseRelativeTime(!useRelativeTime)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      useRelativeTime ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      useRelativeTime ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">{t('settings.dateTime.useRelativeTime')}</span>
@@ -1021,14 +1010,14 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="access-request-cooldown-display"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-text-primary"
                 >
                   {t('settings.dateTime.cooldownFormat')}
                 </label>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.dateTime.cooldownFormatHelp')}
                 </p>
                 <select
@@ -1037,7 +1026,7 @@ export default function SettingsPage() {
                   onChange={(event) =>
                     setAccessRequestCooldownDisplay(event.target.value as 'days' | 'date' | 'both')
                   }
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="days">{t('settings.dateTime.cooldownDays')}</option>
                   <option value="date">{t('settings.dateTime.cooldownDate')}</option>
@@ -1048,28 +1037,26 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel as="section">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.themeSelector.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.themeSelector.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.themeSelector.description')}</p>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label
                 htmlFor="theme-selector-stay-open"
                 className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
                   !autoCloseThemeSelector
-                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
-                    : 'border-[var(--color-border)]'
+                    ? 'border-primary bg-(--color-surface-elevated) shadow-xs'
+                    : 'border-border'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-base font-semibold text-text-primary">
                       {t('settings.themeSelector.stayOpen')}
                     </p>
-                    <p className="text-sm text-[var(--color-text-secondary)]">
+                    <p className="text-sm text-text-secondary">
                       {t('settings.themeSelector.stayOpenHelp')}
                     </p>
                   </div>
@@ -1077,7 +1064,7 @@ export default function SettingsPage() {
                     id="theme-selector-stay-open"
                     type="radio"
                     name="theme-selector-behavior"
-                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    className="h-4 w-4 text-primary focus:ring-primary"
                     checked={!autoCloseThemeSelector}
                     onChange={() => setAutoCloseThemeSelector(false)}
                   />
@@ -1088,16 +1075,16 @@ export default function SettingsPage() {
                 htmlFor="theme-selector-auto-close"
                 className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
                   autoCloseThemeSelector
-                    ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
-                    : 'border-[var(--color-border)]'
+                    ? 'border-primary bg-(--color-surface-elevated) shadow-xs'
+                    : 'border-border'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-base font-semibold text-text-primary">
                       {t('settings.themeSelector.autoClose')}
                     </p>
-                    <p className="text-sm text-[var(--color-text-secondary)]">
+                    <p className="text-sm text-text-secondary">
                       {t('settings.themeSelector.autoCloseHelp')}
                     </p>
                   </div>
@@ -1105,7 +1092,7 @@ export default function SettingsPage() {
                     id="theme-selector-auto-close"
                     type="radio"
                     name="theme-selector-behavior"
-                    className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    className="h-4 w-4 text-primary focus:ring-primary"
                     checked={autoCloseThemeSelector}
                     onChange={() => setAutoCloseThemeSelector(true)}
                   />
@@ -1116,10 +1103,10 @@ export default function SettingsPage() {
 
           {OMNICHAT_ENABLED && (
             <Panel as="section">
-              <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+              <h2 className="mb-4 text-xl font-semibold text-text-primary">
                 {t('settings.omniChatLayout.title')}
               </h2>
-              <p className="text-sm text-[var(--color-text-secondary)]">
+              <p className="text-sm text-text-secondary">
                 {t('settings.omniChatLayout.description')}
               </p>
 
@@ -1128,16 +1115,16 @@ export default function SettingsPage() {
                   htmlFor="omnichat-layout-immersive"
                   className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
                     omniChatLayoutMode === 'immersive'
-                      ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
-                      : 'border-[var(--color-border)]'
+                      ? 'border-primary bg-(--color-surface-elevated) shadow-xs'
+                      : 'border-border'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      <p className="text-base font-semibold text-text-primary">
                         {t('settings.omniChatLayout.immersive')}
                       </p>
-                      <p className="text-sm text-[var(--color-text-secondary)]">
+                      <p className="text-sm text-text-secondary">
                         {t('settings.omniChatLayout.immersiveHelp')}
                       </p>
                     </div>
@@ -1145,7 +1132,7 @@ export default function SettingsPage() {
                       id="omnichat-layout-immersive"
                       type="radio"
                       name="omnichat-layout-mode"
-                      className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                      className="h-4 w-4 text-primary focus:ring-primary"
                       checked={omniChatLayoutMode === 'immersive'}
                       onChange={() => setOmniChatLayoutMode('immersive')}
                     />
@@ -1156,16 +1143,16 @@ export default function SettingsPage() {
                   htmlFor="omnichat-layout-shared-nav"
                   className={`flex cursor-pointer flex-col rounded-lg border p-4 ${
                     omniChatLayoutMode === 'shared-nav'
-                      ? 'border-[var(--color-primary)] bg-[var(--color-surface-elevated)] shadow-sm'
-                      : 'border-[var(--color-border)]'
+                      ? 'border-primary bg-(--color-surface-elevated) shadow-xs'
+                      : 'border-border'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                      <p className="text-base font-semibold text-text-primary">
                         {t('settings.omniChatLayout.sharedNav')}
                       </p>
-                      <p className="text-sm text-[var(--color-text-secondary)]">
+                      <p className="text-sm text-text-secondary">
                         {t('settings.omniChatLayout.sharedNavHelp')}
                       </p>
                     </div>
@@ -1173,7 +1160,7 @@ export default function SettingsPage() {
                       id="omnichat-layout-shared-nav"
                       type="radio"
                       name="omnichat-layout-mode"
-                      className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                      className="h-4 w-4 text-primary focus:ring-primary"
                       checked={omniChatLayoutMode === 'shared-nav'}
                       onChange={() => setOmniChatLayoutMode('shared-nav')}
                     />
@@ -1184,19 +1171,17 @@ export default function SettingsPage() {
           )}
 
           <Panel as="section">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.savedItems.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.savedItems.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.savedItems.description')}</p>
 
-            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
               <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                <p className="text-base font-semibold text-text-primary">
                   {t('settings.savedItems.notifyLabel')}
                 </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.savedItems.notifyHelp')}
                 </p>
               </div>
@@ -1205,8 +1190,8 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={notifyRemovedSavedPosts}
                 onClick={() => setNotifyRemovedSavedPosts(!notifyRemovedSavedPosts)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  notifyRemovedSavedPosts ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                  notifyRemovedSavedPosts ? 'bg-primary' : 'bg-gray-300'
                 }`}
               >
                 <span className="sr-only">{t('settings.savedItems.notifyLabel')}</span>
@@ -1221,19 +1206,17 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel as="section">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.omniFeed.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.omniFeed.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.omniFeed.description')}</p>
 
-            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
               <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                <p className="text-base font-semibold text-text-primary">
                   {t('settings.omniFeed.defaultOmniLabel')}
                 </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.omniFeed.defaultOmniHelp')}
                 </p>
               </div>
@@ -1242,8 +1225,8 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={defaultOmniPostsOnly}
                 onClick={() => setDefaultOmniPostsOnly(!defaultOmniPostsOnly)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  defaultOmniPostsOnly ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                  defaultOmniPostsOnly ? 'bg-primary' : 'bg-gray-300'
                 }`}
               >
                 <span className="sr-only">{t('common.accessibility.toggleOmniFeed')}</span>
@@ -1256,13 +1239,13 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-              <div className="mt-3 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 border-t border-border pt-4">
+              <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="pr-4">
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('settings.omniFeed.stayOnPostLabel')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.omniFeed.stayOnPostHelp')}
                   </p>
                 </div>
@@ -1271,8 +1254,8 @@ export default function SettingsPage() {
                   role="switch"
                   aria-checked={stayOnPostAfterHide}
                   onClick={() => setStayOnPostAfterHide(!stayOnPostAfterHide)}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                    stayOnPostAfterHide ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    stayOnPostAfterHide ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <span className="sr-only">{t('settings.omniFeed.stayOnPostLabel')}</span>
@@ -1289,24 +1272,24 @@ export default function SettingsPage() {
 
           {/* Infinite Scroll Settings */}
           <Panel as="section">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.pageNavigation.title')}
             </h2>
-            <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
+            <p className="mb-6 text-sm text-text-secondary">
               {t('settings.pageNavigation.description')}
             </p>
 
             <div className="space-y-6">
               {/* Home Feed Toggle */}
-              <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-start justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="flex-1">
                   <label
                     htmlFor="infinite-scroll-home-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.pageNavigation.homeFeed')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {useInfiniteScrollHome
                       ? t('settings.pageNavigation.infiniteScroll')
                       : t('settings.pageNavigation.pagination')}
@@ -1320,8 +1303,8 @@ export default function SettingsPage() {
                     role="switch"
                     aria-checked={useInfiniteScrollHome}
                     onClick={() => setUseInfiniteScrollHome(!useInfiniteScrollHome)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      useInfiniteScrollHome ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      useInfiniteScrollHome ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">
@@ -1338,15 +1321,15 @@ export default function SettingsPage() {
               </div>
 
               {/* Hubs Toggle */}
-              <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-start justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="flex-1">
                   <label
                     htmlFor="infinite-scroll-hubs-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.pageNavigation.hubPages')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {useInfiniteScrollHubs
                       ? t('settings.pageNavigation.infiniteScroll')
                       : t('settings.pageNavigation.pagination')}
@@ -1360,8 +1343,8 @@ export default function SettingsPage() {
                     role="switch"
                     aria-checked={useInfiniteScrollHubs}
                     onClick={() => setUseInfiniteScrollHubs(!useInfiniteScrollHubs)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      useInfiniteScrollHubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      useInfiniteScrollHubs ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">
@@ -1378,15 +1361,15 @@ export default function SettingsPage() {
               </div>
 
               {/* Subreddits Toggle */}
-              <div className="flex items-start justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="flex items-start justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <div className="flex-1">
                   <label
                     htmlFor="infinite-scroll-subs-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.pageNavigation.subredditPages')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {useInfiniteScrollSubs
                       ? t('settings.pageNavigation.infiniteScroll')
                       : t('settings.pageNavigation.pagination')}
@@ -1400,8 +1383,8 @@ export default function SettingsPage() {
                     role="switch"
                     aria-checked={useInfiniteScrollSubs}
                     onClick={() => setUseInfiniteScrollSubs(!useInfiniteScrollSubs)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      useInfiniteScrollSubs ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      useInfiniteScrollSubs ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">
@@ -1423,7 +1406,7 @@ export default function SettingsPage() {
         <div hidden={activeTab !== 'privacy'}>
           {/* NSFW Search & Visibility */}
           <Panel as="section">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.nsfw.title')}
             </h2>
             <div className="space-y-4">
@@ -1431,11 +1414,11 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <label
                     htmlFor="block-all-nsfw-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.nsfw.blockAll')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.nsfw.blockAllHelp')}
                   </p>
                 </div>
@@ -1446,8 +1429,8 @@ export default function SettingsPage() {
                     role="switch"
                     aria-checked={blockAllNsfw}
                     onClick={() => setBlockAllNsfw(!blockAllNsfw)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      blockAllNsfw ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      blockAllNsfw ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">{t('settings.nsfw.blockAll')}</span>
@@ -1465,11 +1448,11 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <label
                     htmlFor="search-include-nsfw-default-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.nsfw.defaultInclude')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.nsfw.defaultIncludeHelp')}
                   </p>
                 </div>
@@ -1483,10 +1466,8 @@ export default function SettingsPage() {
                       if (blockAllNsfw) return;
                       setSearchIncludeNsfwByDefault(!searchIncludeNsfwByDefault);
                     }}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      searchIncludeNsfwByDefault && !blockAllNsfw
-                        ? 'bg-[var(--color-primary)]'
-                        : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      searchIncludeNsfwByDefault && !blockAllNsfw ? 'bg-primary' : 'bg-gray-300'
                     } ${blockAllNsfw ? 'opacity-60' : ''}`}
                     aria-disabled={blockAllNsfw}
                   >
@@ -1507,11 +1488,11 @@ export default function SettingsPage() {
                 <div className="flex-1">
                   <label
                     htmlFor="block-nsfw-thumbnails-toggle"
-                    className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                    className="block text-sm font-semibold text-text-primary"
                   >
                     {t('settings.nsfw.blockThumbnails')}
                   </label>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('settings.nsfw.blockThumbnailsHelp')}
                   </p>
                 </div>
@@ -1522,8 +1503,8 @@ export default function SettingsPage() {
                     role="switch"
                     aria-checked={blockNsfwThumbnails}
                     onClick={() => setBlockNsfwThumbnails(!blockNsfwThumbnails)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                      blockNsfwThumbnails ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                      blockNsfwThumbnails ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span className="sr-only">{t('settings.nsfw.blockThumbnails')}</span>
@@ -1541,12 +1522,10 @@ export default function SettingsPage() {
 
           {/* Email Settings */}
           <Panel as="section">
-            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-2 text-xl font-semibold text-text-primary">
               {t('settings.email.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.email.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.email.description')}</p>
 
             <div className="mt-4">
               {isEditingEmail ? (
@@ -1589,7 +1568,7 @@ export default function SettingsPage() {
                   <div>
                     <label
                       htmlFor="email"
-                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                      className="block text-sm font-semibold text-text-primary"
                     >
                       {t('settings.email.newEmail')}
                     </label>
@@ -1598,7 +1577,7 @@ export default function SettingsPage() {
                       id="email"
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                       placeholder={t('auth.fields.emailPlaceholder')}
                       required
                     />
@@ -1607,7 +1586,7 @@ export default function SettingsPage() {
                   <div>
                     <label
                       htmlFor="emailConfirm"
-                      className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                      className="block text-sm font-semibold text-text-primary"
                     >
                       {t('settings.email.confirmEmail')}
                     </label>
@@ -1616,7 +1595,7 @@ export default function SettingsPage() {
                       id="emailConfirm"
                       value={emailConfirmInput}
                       onChange={(e) => setEmailConfirmInput(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      className="mt-1 block w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                       placeholder={t('auth.fields.emailPlaceholder')}
                       required
                     />
@@ -1641,7 +1620,7 @@ export default function SettingsPage() {
                     <button
                       type="submit"
                       disabled={isUpdatingEmail}
-                      className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                     >
                       {isUpdatingEmail
                         ? t('settings.email.updating')
@@ -1655,7 +1634,7 @@ export default function SettingsPage() {
                         setEmailConfirmInput('');
                         setEmailError(null);
                       }}
-                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)]"
+                      className="rounded-md border border-border bg-(--color-surface-elevated) px-4 py-2 text-sm font-semibold text-text-primary hover:border-primary"
                     >
                       {t('common.cancel')}
                     </button>
@@ -1663,12 +1642,12 @@ export default function SettingsPage() {
                 </form>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+                  <div className="flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
                     <div>
-                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                      <p className="text-sm font-semibold text-text-primary">
                         {t('settings.email.currentEmail')}
                       </p>
-                      <p className="mt-1 text-base text-[var(--color-text-secondary)]">
+                      <p className="mt-1 text-base text-text-secondary">
                         {user?.email || t('settings.email.noEmail')}
                       </p>
                     </div>
@@ -1681,7 +1660,7 @@ export default function SettingsPage() {
                         setEmailError(null);
                         setEmailSuccess(false);
                       }}
-                      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                      className="rounded-md border border-border bg-(--color-surface-elevated) px-4 py-2 text-sm font-semibold text-text-primary hover:border-primary hover:text-primary"
                     >
                       {user?.email
                         ? t('settings.email.updateButton')
@@ -1748,18 +1727,18 @@ export default function SettingsPage() {
 
         <div hidden={activeTab !== 'audio_video'}>
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.audioVideo.devicesTitle')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.audioVideo.devicesDescription')}
             </p>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-1">
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="preferred-microphone"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-text-primary"
                 >
                   {t('settings.audioVideo.microphone')}
                 </label>
@@ -1767,7 +1746,7 @@ export default function SettingsPage() {
                   id="preferred-microphone"
                   value={micDeviceId}
                   onChange={(e) => setMicDeviceId(e.target.value)}
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="">{t('settings.audioVideo.defaultDevice')}</option>
                   {microphones.map((device, index) => (
@@ -1778,10 +1757,10 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="preferred-camera"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-text-primary"
                 >
                   {t('settings.audioVideo.camera')}
                 </label>
@@ -1789,7 +1768,7 @@ export default function SettingsPage() {
                   id="preferred-camera"
                   value={cameraDeviceId}
                   onChange={(e) => setCameraDeviceId(e.target.value)}
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="">{t('settings.audioVideo.defaultDevice')}</option>
                   {cameras.map((device, index) => (
@@ -1800,10 +1779,10 @@ export default function SettingsPage() {
                 </select>
               </div>
 
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+              <div className="rounded-md border border-border bg-(--color-surface-elevated) p-4">
                 <label
                   htmlFor="preferred-speaker"
-                  className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                  className="block text-sm font-semibold text-text-primary"
                 >
                   {t('settings.audioVideo.speaker')}
                 </label>
@@ -1811,7 +1790,7 @@ export default function SettingsPage() {
                   id="preferred-speaker"
                   value={speakerDeviceId}
                   onChange={(e) => setSpeakerDeviceId(e.target.value)}
-                  className="mt-3 w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="mt-3 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
                 >
                   <option value="">{t('settings.audioVideo.defaultDevice')}</option>
                   {speakers.map((device, index) => (
@@ -1825,19 +1804,19 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel as="section">
-            <h3 className="mb-4 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h3 className="mb-4 text-xl font-semibold text-text-primary">
               {t('settings.audioVideo.transcriptionTitle')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.audioVideo.transcriptionDescription')}
             </p>
 
-            <div className="mt-4 flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
+            <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-(--color-surface-elevated) p-4">
               <div className="pr-4">
-                <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                <p className="text-base font-semibold text-text-primary">
                   {t('settings.audioVideo.transcriptionToggle')}
                 </p>
-                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                <p className="mt-1 text-sm text-text-secondary">
                   {t('settings.audioVideo.transcriptionHelp')}
                 </p>
               </div>
@@ -1846,8 +1825,8 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={transcriptionOptIn}
                 onClick={() => setTranscriptionOptIn(!transcriptionOptIn)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
-                  transcriptionOptIn ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                  transcriptionOptIn ? 'bg-primary' : 'bg-gray-300'
                 }`}
               >
                 <span className="sr-only">{t('settings.audioVideo.transcriptionToggle')}</span>
@@ -1863,30 +1842,30 @@ export default function SettingsPage() {
 
           {(voiceCallsEnabled || videoCallsEnabled || lazyLoadImagesEnabled) && (
             <>
-              <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-                <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+              <div className="border-b border-border pb-2 pt-4">
+                <h2 className="text-2xl font-bold text-text-primary">
                   {t('settings.betaFeatures.title')}
                 </h2>
               </div>
 
               <Panel as="section">
-                <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+                <h2 className="mb-2 text-xl font-semibold text-text-primary">
                   {t('settings.betaFeatures.experimentalTitle')}
                 </h2>
-                <p className="text-sm text-[var(--color-text-secondary)]">
+                <p className="text-sm text-text-secondary">
                   {t('settings.betaFeatures.experimentalDescription')}
                 </p>
 
                 <div className="mt-4 space-y-4">
                   {voiceCallsEnabled && (
-                    <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
+                    <div className="rounded-md border border-primary bg-blue-50 p-4">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">🎙️</span>
                         <div>
-                          <h4 className="font-semibold text-[var(--color-text-primary)]">
+                          <h4 className="font-semibold text-text-primary">
                             {t('settings.betaFeatures.voiceCalls')}
                           </h4>
-                          <p className="text-sm text-[var(--color-text-secondary)]">
+                          <p className="text-sm text-text-secondary">
                             {t('settings.betaFeatures.voiceCallsDescription')}
                           </p>
                         </div>
@@ -1895,14 +1874,14 @@ export default function SettingsPage() {
                   )}
 
                   {videoCallsEnabled && (
-                    <div className="rounded-md border border-[var(--color-primary)] bg-blue-50 p-4">
+                    <div className="rounded-md border border-primary bg-blue-50 p-4">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">📹</span>
                         <div>
-                          <h4 className="font-semibold text-[var(--color-text-primary)]">
+                          <h4 className="font-semibold text-text-primary">
                             {t('settings.betaFeatures.videoCalls')}
                           </h4>
-                          <p className="text-sm text-[var(--color-text-secondary)]">
+                          <p className="text-sm text-text-secondary">
                             {t('settings.betaFeatures.videoCallsDescription')}
                           </p>
                         </div>
@@ -1915,10 +1894,10 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-lg">⚡</span>
                         <div>
-                          <h4 className="font-semibold text-[var(--color-text-primary)]">
+                          <h4 className="font-semibold text-text-primary">
                             {t('settings.betaFeatures.performanceMode')}
                           </h4>
-                          <p className="text-sm text-[var(--color-text-secondary)]">
+                          <p className="text-sm text-text-secondary">
                             {t('settings.betaFeatures.performanceModeDescription')}
                           </p>
                         </div>
@@ -1926,8 +1905,8 @@ export default function SettingsPage() {
                     </div>
                   )}
 
-                  <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-3">
-                    <p className="text-xs text-[var(--color-text-secondary)]">
+                  <div className="rounded-md border border-border bg-(--color-surface-elevated) p-3">
+                    <p className="text-xs text-text-secondary">
                       <Trans
                         i18nKey="settings.betaFeatures.noteWithLabel"
                         components={{ strong: <strong /> }}
@@ -1942,24 +1921,22 @@ export default function SettingsPage() {
 
         <div hidden={activeTab !== 'privacy'}>
           {/* Account & Privacy */}
-          <div className="border-b border-[var(--color-border)] pb-2 pt-4">
-            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">
+          <div className="border-b border-border pb-2 pt-4">
+            <h2 className="text-2xl font-bold text-text-primary">
               {t('settings.categories.accountPrivacy')}
             </h2>
           </div>
 
           {/* Data Export (P0-016: GDPR Right to Data Portability) */}
           <Panel as="section">
-            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-2 text-xl font-semibold text-text-primary">
               {t('settings.dataExport.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.dataExport.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.dataExport.description')}</p>
 
             <div className="mt-4">
               <label
-                className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]"
+                className="mb-2 block text-sm font-medium text-text-primary"
                 htmlFor="export-password"
               >
                 Confirm password
@@ -1970,7 +1947,7 @@ export default function SettingsPage() {
                 autoComplete="current-password"
                 value={exportPassword}
                 onChange={(event) => setExportPassword(event.target.value)}
-                className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)]"
+                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary"
               />
 
               <div className="mt-4">
@@ -2028,7 +2005,7 @@ export default function SettingsPage() {
                     }
                   }}
                   disabled={isRequestingExport || !exportPassword.trim()}
-                  className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {isRequestingExport
                     ? t('settings.dataExport.requesting')
@@ -2047,18 +2024,18 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <div className="mt-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-                  <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+                <div className="mt-4 rounded-md border border-border bg-(--color-surface-elevated) p-4">
+                  <h4 className="text-sm font-semibold text-text-primary">
                     {t('settings.dataExport.included')}
                   </h4>
-                  <ul className="mt-2 space-y-1 text-sm text-[var(--color-text-secondary)]">
+                  <ul className="mt-2 space-y-1 text-sm text-text-secondary">
                     {(
                       t('settings.dataExport.includedList', { returnObjects: true }) as string[]
                     ).map((item: string, index: number) => (
                       <li key={index}>• {item}</li>
                     ))}
                   </ul>
-                  <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+                  <p className="mt-3 text-xs text-text-secondary">
                     {t('settings.dataExport.availabilityNote')}
                   </p>
                 </div>
@@ -2068,10 +2045,10 @@ export default function SettingsPage() {
 
           {/* Account Deletion */}
           <Panel as="section">
-            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-2 text-xl font-semibold text-text-primary">
               {t('settings.accountDeletion.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-text-secondary">
               {t('settings.accountDeletion.description')}
             </p>
 
@@ -2086,16 +2063,14 @@ export default function SettingsPage() {
           </Panel>
 
           <Panel as="section">
-            <h2 className="mb-2 text-xl font-semibold text-[var(--color-text-primary)]">
+            <h2 className="mb-2 text-xl font-semibold text-text-primary">
               {t('settings.blockedUsers.title')}
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('settings.blockedUsers.description')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('settings.blockedUsers.description')}</p>
             <div className="mt-4">
               <Link
                 to="/settings/blocked-users"
-                className="inline-block rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                className="inline-block rounded-md border border-border bg-(--color-surface-elevated) px-4 py-2 text-sm font-semibold text-text-primary hover:border-primary hover:text-primary"
               >
                 {t('settings.blockedUsers.manageButton')}
               </Link>

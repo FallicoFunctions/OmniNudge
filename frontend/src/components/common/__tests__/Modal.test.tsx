@@ -41,12 +41,12 @@ describe('Modal', () => {
     unmount();
 
     render(
-      <Modal isOpen layerClassName="z-[110]" ariaLabelledBy="raised-layer-title">
+      <Modal isOpen layerClassName="z-110" ariaLabelledBy="raised-layer-title">
         <h2 id="raised-layer-title">Raised layer</h2>
       </Modal>
     );
     const overlay = screen.getByRole('dialog').parentElement;
-    expect(overlay).toHaveClass('z-[110]');
+    expect(overlay).toHaveClass('z-110');
     expect(overlay).not.toHaveClass('z-50');
   });
 

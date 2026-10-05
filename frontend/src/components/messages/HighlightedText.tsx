@@ -27,7 +27,7 @@ export function HighlightedText({ text, highlight, className }: HighlightedTextP
           return (
             <mark
               key={index}
-              className="bg-yellow-300 text-[var(--color-text-primary)] font-semibold rounded px-0.5"
+              className="bg-yellow-300 text-text-primary font-semibold rounded-sm px-0.5"
             >
               {part}
             </mark>

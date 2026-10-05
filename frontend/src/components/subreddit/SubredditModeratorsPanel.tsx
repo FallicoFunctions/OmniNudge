@@ -18,8 +18,8 @@ export function SubredditModeratorsPanel({
   const resolvedFallbackMessage = fallbackMessage ?? t('subreddit.moderatorsPanel.fallback');
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
         {t('subreddit.moderatorsPanel.title')}
       </h3>
       {isLoading ? (
@@ -27,12 +27,12 @@ export function SubredditModeratorsPanel({
           {t('subreddit.moderatorsPanel.loading')}
         </LoadingMessage>
       ) : moderators.length > 0 ? (
-        <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
+        <ul className="mt-3 space-y-2 text-sm text-text-primary">
           {moderators.map((mod) => (
             <li key={mod.id} className="flex items-center justify-between">
               <span>{t('common.format.userPath', { name: mod.name ?? mod.id })}</span>
               {mod.mod_permissions && mod.mod_permissions.length > 0 && (
-                <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <span className="text-xs uppercase tracking-wide text-text-secondary">
                   {mod.mod_permissions.join(', ')}
                 </span>
               )}

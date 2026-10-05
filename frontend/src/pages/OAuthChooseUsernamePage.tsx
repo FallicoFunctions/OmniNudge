@@ -46,12 +46,10 @@ export default function OAuthChooseUsernamePage() {
     <div className="flex min-h-screen items-center justify-center p-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
+        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6"
       >
-        <h1 className="mb-1 text-lg font-semibold text-[var(--color-text-primary)]">
-          Choose your username
-        </h1>
-        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+        <h1 className="mb-1 text-lg font-semibold text-text-primary">Choose your username</h1>
+        <p className="mb-4 text-sm text-text-secondary">
           This is how other people will see you on OmniNudge. You can't change it later.
         </p>
 
@@ -59,7 +57,7 @@ export default function OAuthChooseUsernamePage() {
           <div>
             <label
               htmlFor="oauth-username"
-              className="block text-sm font-semibold text-[var(--color-text-primary)]"
+              className="block text-sm font-semibold text-text-primary"
             >
               Username <span className="text-red-500">*</span>
             </label>
@@ -69,7 +67,7 @@ export default function OAuthChooseUsernamePage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
-              className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="mt-1 w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
               placeholder="username"
               minLength={3}
               maxLength={50}
@@ -81,20 +79,20 @@ export default function OAuthChooseUsernamePage() {
             <div>
               <label
                 htmlFor="oauth-email"
-                className="block text-sm font-semibold text-[var(--color-text-primary)]"
+                className="block text-sm font-semibold text-text-primary"
               >
-                Email <span className="text-xs text-[var(--color-text-secondary)]">(optional)</span>
+                Email <span className="text-xs text-text-secondary">(optional)</span>
               </label>
               <input
                 id="oauth-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                className="mt-1 w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-sm text-text-primary placeholder-(--color-text-muted) focus:outline-hidden focus:ring-2 focus:ring-primary"
                 placeholder="you@example.com"
                 autoComplete="email"
               />
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              <p className="mt-1 text-xs text-text-secondary">
                 Lets you recover your account and link other sign-in methods later.
               </p>
             </div>
@@ -106,7 +104,7 @@ export default function OAuthChooseUsernamePage() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-4 w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          className="mt-4 w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
         >
           {submitting ? 'Creating account…' : 'Continue'}
         </button>

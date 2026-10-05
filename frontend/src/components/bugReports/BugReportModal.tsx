@@ -105,16 +105,14 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-2xl rounded-lg bg-[var(--color-surface)] p-6 shadow-xl"
+      className="w-full max-w-2xl rounded-lg bg-surface p-6 shadow-xl"
     >
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
-        <h2 className="text-2xl font-semibold text-[var(--color-text-primary)]">
-          {t('bugReportModal.title')}
-        </h2>
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <h2 className="text-2xl font-semibold text-text-primary">{t('bugReportModal.title')}</h2>
         <button
           onClick={onClose}
           aria-label={t('common.close')}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] text-2xl"
+          className="text-text-secondary hover:text-text-primary text-2xl"
         >
           ×
         </button>
@@ -129,7 +127,7 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
             >
               {t('bugReportModal.success.ok')}
             </button>
@@ -143,7 +141,7 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               {t('bugReportModal.form.pageUrl.label')} <span className="text-red-500">*</span>
             </label>
             <input
@@ -152,15 +150,15 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
               value={pageUrl}
               onChange={(e) => setPageUrl(e.target.value)}
               placeholder={t('bugReportModal.form.pageUrl.placeholder')}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
             />
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            <p className="mt-1 text-xs text-text-secondary">
               {t('bugReportModal.form.pageUrl.help')}
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               {t('bugReportModal.form.description.label')} <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -169,12 +167,12 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
               onChange={(e) => setDescription(e.target.value)}
               rows={6}
               placeholder={t('bugReportModal.form.description.placeholder')}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary placeholder-(--color-text-muted) focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               {t('bugReportModal.form.screenshot.label')}
             </label>
             <input
@@ -191,9 +189,9 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
                 setErrorMessage('');
                 setScreenshot(file);
               }}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2 text-[var(--color-text-primary)] file:mr-4 file:rounded file:border-0 file:bg-[var(--color-primary)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[var(--color-primary-dark)]"
+              className="w-full rounded-md border border-border bg-(--color-surface-elevated) px-3 py-2 text-text-primary file:mr-4 file:rounded-sm file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-dark"
             />
-            <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            <p className="mt-1 text-xs text-text-secondary">
               {t('bugReportModal.form.screenshot.help')}
             </p>
           </div>
@@ -202,14 +200,14 @@ export default function BugReportModal({ isOpen, onClose, initialUrl }: BugRepor
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)]"
+              className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-text-primary hover:bg-(--color-surface-elevated)"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={uploading || submitBugMutation.isPending}
-              className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading || submitBugMutation.isPending
                 ? t('bugReportModal.actions.submitting')

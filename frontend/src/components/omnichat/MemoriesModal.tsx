@@ -38,17 +38,12 @@ function MemoryList({
   return (
     <ul className="space-y-3">
       {memories.map((memory) => (
-        <li
-          key={memory.id}
-          className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-        >
+        <li key={memory.id} className="rounded-2xl border border-border bg-surface p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <Title className="truncate font-medium text-[var(--color-text)]">
-                {memory.title}
-              </Title>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{memory.summary}</p>
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+              <Title className="truncate font-medium text-(--color-text)">{memory.title}</Title>
+              <p className="mt-1 text-sm text-text-secondary">{memory.summary}</p>
+              <p className="mt-2 text-xs text-text-secondary">
                 {t('omnichat.memories.recordedAt', {
                   date: new Date(memory.recorded_at).toLocaleDateString(),
                 })}
@@ -61,7 +56,7 @@ function MemoryList({
                   onClick={onCancelForget}
                   disabled={isForgetting}
                   aria-label={t('omnichat.memories.cancelForgetLabel', { title: memory.title })}
-                  className="rounded-2xl border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text)] disabled:opacity-60"
+                  className="rounded-2xl border border-border px-3 py-1.5 text-xs text-(--color-text) disabled:opacity-60"
                 >
                   {t('common.cancel')}
                 </button>
@@ -87,7 +82,7 @@ function MemoryList({
                 type="button"
                 onClick={() => onStartForget(memory.id)}
                 aria-label={t('omnichat.memories.forgetLabel', { title: memory.title })}
-                className="shrink-0 rounded-full p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-background)] hover:text-[var(--color-error)]"
+                className="shrink-0 rounded-full p-2 text-text-secondary hover:bg-background hover:text-(--color-error)"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -173,21 +168,20 @@ export default function MemoriesModal({
     onForget: (id: number) => forget.mutate(id),
   };
 
-  const headingClass =
-    'mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]';
+  const headingClass = 'mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       closeOnOverlayClick
-      className="w-full max-w-2xl rounded-3xl bg-[var(--color-background)] p-0 shadow-2xl"
+      className="w-full max-w-2xl rounded-3xl bg-background p-0 shadow-2xl"
       overlayClassName="bg-black/60 flex items-center justify-center"
     >
-      <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-[var(--color-primary)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">
+          <Brain className="h-5 w-5 text-primary" aria-hidden="true" />
+          <h2 className="text-lg font-semibold text-(--color-text)">
             {t('omnichat.memories.title', { name: personaName })}
           </h2>
         </div>
@@ -195,32 +189,32 @@ export default function MemoriesModal({
           type="button"
           onClick={onClose}
           aria-label={t('omnichat.memories.close')}
-          className="rounded-full p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]"
+          className="rounded-full p-2 text-text-secondary hover:bg-surface"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
       <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
-        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+        <p className="mb-4 text-sm text-text-secondary">
           {t('omnichat.memories.description', { name: personaName })}
         </p>
 
         {isLoading && (
-          <div className="flex items-center justify-center py-10 text-[var(--color-text-secondary)]">
+          <div className="flex items-center justify-center py-10 text-text-secondary">
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
             <span className="ml-2 text-sm">{t('omnichat.memories.loading')}</span>
           </div>
         )}
 
         {isError && (
-          <p role="alert" className="py-8 text-center text-sm text-[var(--color-error)]">
+          <p role="alert" className="py-8 text-center text-sm text-(--color-error)">
             {t('omnichat.memories.loadError')}
           </p>
         )}
 
         {!isLoading && !isError && memories.length === 0 && (
-          <p className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
+          <p className="py-8 text-center text-sm text-text-secondary">
             {t('omnichat.memories.empty', { name: personaName })}
           </p>
         )}
@@ -232,7 +226,7 @@ export default function MemoriesModal({
             <section>
               <h3 className={headingClass}>{t('omnichat.memories.sharedHeading')}</h3>
               {shared.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-secondary)]">
+                <p className="text-sm text-text-secondary">
                   {t('omnichat.memories.sharedEmpty', { name: personaName })}
                 </p>
               ) : (
@@ -243,7 +237,7 @@ export default function MemoriesModal({
               <h3 className={headingClass}>
                 {t('omnichat.memories.ownLifeHeading', { name: personaName })}
               </h3>
-              <p className="mb-3 text-sm text-[var(--color-text-secondary)]">
+              <p className="mb-3 text-sm text-text-secondary">
                 {t('omnichat.memories.ownLifeDescription', { name: personaName })}
               </p>
               <MemoryList memories={ownLife} grouped {...listProps} />
@@ -252,13 +246,13 @@ export default function MemoriesModal({
         )}
 
         {data?.has_more && (
-          <p className="mt-3 text-center text-xs text-[var(--color-text-secondary)]">
+          <p className="mt-3 text-center text-xs text-text-secondary">
             {t('omnichat.memories.truncated', { shown: memories.length, total: data.total })}
           </p>
         )}
 
         {forget.isError && (
-          <p role="alert" className="mt-3 text-sm text-[var(--color-error)]">
+          <p role="alert" className="mt-3 text-sm text-(--color-error)">
             {t('omnichat.memories.forgetFailed')}
           </p>
         )}

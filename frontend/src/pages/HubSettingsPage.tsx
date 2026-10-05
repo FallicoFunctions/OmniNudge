@@ -106,30 +106,28 @@ export default function HubSettingsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)]">
+    <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-2">
+            <h1 className="text-3xl font-bold text-text-primary mb-2">
               {t('hubSettingsPage.header.title', { hub: hubName })}
             </h1>
-            <p className="text-[var(--color-text-secondary)]">
-              {t('hubSettingsPage.header.subtitle')}
-            </p>
+            <p className="text-text-secondary">{t('hubSettingsPage.header.subtitle')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => navigate(`/h/${hubName}`)}
-              className="px-4 py-2 rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-border)] transition-colors"
+              className="px-4 py-2 rounded-sm bg-(--color-surface-elevated) text-text-primary hover:bg-border transition-colors"
             >
               {t('hubSettingsPage.actions.exit')}
             </button>
             <button
               type="button"
               onClick={() => navigate(`/h/${hubName}/mod`)}
-              className="px-4 py-2 rounded border border-[var(--color-border)] text-[var(--color-text-primary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+              className="px-4 py-2 rounded-sm border border-border text-text-primary hover:border-primary hover:text-primary transition-colors"
             >
               {t('hubSettingsPage.actions.backToModTools')}
             </button>
@@ -154,7 +152,7 @@ export default function HubSettingsPage() {
         )}
 
         {/* Tabs - SETTINGS-1: Grouped with visual separators */}
-        <div className="border-b border-[var(--color-border)] mb-6">
+        <div className="border-b border-border mb-6">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             {tabs.map((tab, index) => {
               const prevGroup = index > 0 ? tabs[index - 1].group : null;
@@ -162,13 +160,13 @@ export default function HubSettingsPage() {
 
               return (
                 <div key={tab.id} className="flex items-center gap-x-8">
-                  {showDivider && <div className="h-6 w-px bg-[var(--color-border)]" />}
+                  {showDivider && <div className="h-6 w-px bg-border" />}
                   <button
                     onClick={() => setActiveTab(tab.id)}
                     className={`pb-4 px-2 border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === tab.id
-                        ? 'border-[var(--color-primary)] text-[var(--color-primary)] font-medium'
-                        : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border)]'
+                        ? 'border-primary text-primary font-medium'
+                        : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border'
                     }`}
                   >
                     {tab.label}
@@ -180,7 +178,7 @@ export default function HubSettingsPage() {
         </div>
 
         {/* Tab Content */}
-        <div className="bg-[var(--color-surface)] rounded-lg shadow-md p-6">
+        <div className="bg-surface rounded-lg shadow-md p-6">
           {activeTab === 'general' && (
             <GeneralSettingsTab
               settings={settings}

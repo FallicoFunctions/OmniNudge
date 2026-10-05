@@ -56,7 +56,7 @@ export function AccountMenu({
   }, [isOpen]);
 
   const itemClass =
-    'flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors';
+    'flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-text-primary hover:bg-(--color-surface-elevated) transition-colors';
 
   return (
     <div ref={menuRef} className="relative">
@@ -65,7 +65,7 @@ export function AccountMenu({
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors"
+        className="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated) transition-colors"
       >
         <svg
           className="w-4 h-4"
@@ -92,7 +92,7 @@ export function AccountMenu({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
         {incomingCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-[10px] font-bold text-white">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
             {incomingCount}
           </span>
         )}
@@ -101,7 +101,7 @@ export function AccountMenu({
       {isOpen && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-56 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg overflow-hidden z-50"
+          className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-lg shadow-lg overflow-hidden z-50"
         >
           <Link
             to={`/users/${username}`}
@@ -171,7 +171,7 @@ export function AccountMenu({
             </svg>
             <span className="flex-1">{t('friends.title')}</span>
             {incomingCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-primary)] px-1 text-xs font-bold text-white">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-white">
                 {incomingCount}
               </span>
             )}
@@ -184,7 +184,7 @@ export function AccountMenu({
                 onUpgrade();
                 setIsOpen(false);
               }}
-              className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors"
+              className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
               role="menuitem"
             >
               <svg
@@ -210,7 +210,7 @@ export function AccountMenu({
               <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/20 px-2 py-0.5 text-xs font-semibold text-green-700 dark:text-green-400">
                 ✓ Paid
               </span>
-              <span className="text-xs text-[var(--color-text-muted)]">
+              <span className="text-xs text-(--color-text-muted)">
                 until {new Date(planExpiresAt).toLocaleDateString()}
               </span>
             </div>
@@ -278,7 +278,7 @@ export function AccountMenu({
             Donate
           </Link>
 
-          <hr className="border-[var(--color-border)] my-1" />
+          <hr className="border-border my-1" />
 
           <Link
             to="/settings"
@@ -334,7 +334,7 @@ export function AccountMenu({
             </Link>
           )}
 
-          <hr className="border-[var(--color-border)] my-1" />
+          <hr className="border-border my-1" />
 
           <button
             type="button"

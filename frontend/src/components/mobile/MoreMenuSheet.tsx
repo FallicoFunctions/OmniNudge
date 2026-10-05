@@ -193,7 +193,7 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
         {groupedItems.map((group, groupIndex) => (
           <div key={groupIndex}>
             {/* Divider between sections */}
-            {groupIndex > 0 && <div className="my-2 border-t border-[var(--color-border)]" />}
+            {groupIndex > 0 && <div className="my-2 border-t border-border" />}
 
             {/* Menu items */}
             {group.map((item) => (
@@ -203,18 +203,18 @@ export function MoreMenuSheet({ isOpen, onClose }: MoreMenuSheetProps) {
                 onClick={item.onClick}
                 className={`
                 flex items-center w-full px-4 py-4 text-left
-                active:bg-[var(--color-hover)] transition-colors
+                active:bg-(--color-hover) transition-colors
                 ${item.danger ? 'text-red-500' : ''}
               `}
                 data-testid={item.testId}
               >
                 <item.icon
                   size={24}
-                  className={`mr-3 ${item.danger ? 'text-red-500' : 'text-[var(--color-text-secondary)]'}`}
+                  className={`mr-3 ${item.danger ? 'text-red-500' : 'text-text-secondary'}`}
                 />
                 <span
                   className={`text-base font-medium ${
-                    item.danger ? 'text-red-500' : 'text-[var(--color-text-primary)]'
+                    item.danger ? 'text-red-500' : 'text-text-primary'
                   }`}
                 >
                   {item.label}

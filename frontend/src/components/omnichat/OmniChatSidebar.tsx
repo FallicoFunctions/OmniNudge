@@ -102,12 +102,12 @@ function SidebarNav({
                 : 'h-14 justify-start px-4'
             } gap-3 ${
               active
-                ? 'border-blue-300/20 bg-gradient-to-r from-blue-500/20 to-sky-500/[0.07] text-white shadow-[0_16px_40px_rgba(20,48,96,0.25)]'
-                : 'border-transparent bg-transparent text-[rgba(255,255,255,0.58)] hover:border-white/10 hover:bg-white/[0.045] hover:text-white'
+                ? 'border-blue-300/20 bg-linear-to-r from-blue-500/20 to-sky-500/[0.07] text-white shadow-[0_16px_40px_rgba(20,48,96,0.25)]'
+                : 'border-transparent bg-transparent text-[rgba(255,255,255,0.58)] hover:border-white/10 hover:bg-white/4.5 hover:text-white'
             }`}
           >
             <span
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-blue-400/15 text-blue-200' : ''}`}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${active ? 'bg-blue-400/15 text-blue-200' : ''}`}
             >
               <Icon size={19} />
             </span>
@@ -150,7 +150,7 @@ export default function OmniChatSidebar({
   return (
     <>
       <aside
-        className={`hidden h-full border-r border-white/[0.08] bg-[#0c0d13]/80 py-4 backdrop-blur-2xl transition-[width,padding] duration-300 lg:flex lg:flex-col ${
+        className={`hidden h-full border-r border-white/8 bg-[#0c0d13]/80 py-4 backdrop-blur-2xl transition-[width,padding] duration-300 lg:flex lg:flex-col ${
           desktopCollapsed ? 'w-[72px] px-2' : 'w-[223px] px-3'
         }`}
       >
@@ -168,7 +168,7 @@ export default function OmniChatSidebar({
             aria-label={
               desktopCollapsed ? t('omnichat.sidebar.openMenu') : t('omnichat.sidebar.closeMenu')
             }
-            className={`flex items-center justify-center border border-white/10 bg-white/[0.04] text-white/65 transition hover:bg-white/[0.08] hover:text-white ${
+            className={`flex items-center justify-center border border-white/10 bg-white/4 text-white/65 transition hover:bg-white/8 hover:text-white ${
               desktopCollapsed ? 'h-10 w-10 rounded-[18px]' : 'h-10 w-10 rounded-2xl'
             }`}
           >
@@ -184,7 +184,7 @@ export default function OmniChatSidebar({
             <button
               type="button"
               onClick={onSignIn}
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium text-[rgba(255,255,255,0.72)] transition hover:bg-white/[0.08] hover:text-white"
+              className="w-full rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-left text-sm font-medium text-[rgba(255,255,255,0.72)] transition hover:bg-white/8 hover:text-white"
             >
               {t('auth.buttons.signIn')}
             </button>
@@ -247,7 +247,7 @@ export default function OmniChatSidebar({
                 <button
                   type="button"
                   onClick={onSignIn}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-medium text-[rgba(255,255,255,0.72)] transition hover:bg-white/[0.08] hover:text-white"
+                  className="w-full rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-left text-sm font-medium text-[rgba(255,255,255,0.72)] transition hover:bg-white/8 hover:text-white"
                 >
                   {t('auth.buttons.signIn')}
                 </button>

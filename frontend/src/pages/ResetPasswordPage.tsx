@@ -108,11 +108,11 @@ export default function ResetPasswordPage() {
 
   if (isValidating) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
-        <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-md rounded-lg border border-border bg-surface p-8">
           <div className="flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-primary)]"></div>
-            <span className="ml-3 text-[var(--color-text-primary)]">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-primary"></div>
+            <span className="ml-3 text-text-primary">
               {t('auth.resetPasswordPage.status.validating')}
             </span>
           </div>
@@ -123,12 +123,12 @@ export default function ResetPasswordPage() {
 
   if (!isValid || !token) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
-        <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
-          <h1 className="mb-4 text-2xl font-bold text-[var(--color-text-primary)]">
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-md rounded-lg border border-border bg-surface p-8">
+          <h1 className="mb-4 text-2xl font-bold text-text-primary">
             {t('auth.resetPasswordPage.invalidLinkTitle')}
           </h1>
-          <p className="mb-6 text-[var(--color-text-secondary)]">
+          <p className="mb-6 text-text-secondary">
             {error?.message || t('auth.resetPasswordPage.errors.linkInvalidOrExpired')}
           </p>
           <Button
@@ -145,8 +145,8 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
-        <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-md rounded-lg border border-border bg-surface p-8">
           <div className="mb-4 flex items-center justify-center">
             <svg
               className="h-16 w-16 text-green-500"
@@ -160,16 +160,16 @@ export default function ResetPasswordPage() {
               <path d="M5 13l4 4L19 7"></path>
             </svg>
           </div>
-          <h1 className="mb-4 text-center text-2xl font-bold text-[var(--color-text-primary)]">
+          <h1 className="mb-4 text-center text-2xl font-bold text-text-primary">
             {t('auth.resetPasswordPage.success.title')}
           </h1>
-          <p className="mb-6 text-center text-[var(--color-text-secondary)]">
+          <p className="mb-6 text-center text-text-secondary">
             {t('auth.resetPasswordPage.success.description')}
           </p>
-          <p className="mb-6 text-center text-sm text-[var(--color-text-secondary)]">
+          <p className="mb-6 text-center text-sm text-text-secondary">
             {t('auth.resetPasswordPage.success.phraseNote')}
           </p>
-          <p className="text-center text-sm text-[var(--color-text-muted)]">
+          <p className="text-center text-sm text-(--color-text-muted)">
             {t('auth.resetPasswordPage.status.redirectingHome')}
           </p>
         </div>
@@ -178,13 +178,13 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)] px-4">
-      <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
-        <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-8">
+        <h1 className="mb-2 text-2xl font-bold text-text-primary">
           {t('auth.resetPasswordPage.title')}
         </h1>
         {username && (
-          <p className="mb-6 text-sm text-[var(--color-text-secondary)]">
+          <p className="mb-6 text-sm text-text-secondary">
             {t('auth.resetPasswordPage.resettingFor')}{' '}
             <span className="font-semibold">{username}</span>
           </p>
@@ -200,7 +200,7 @@ export default function ResetPasswordPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
               placeholder={t('auth.resetPasswordPage.fields.newPasswordPlaceholder')}
               required
               minLength={8}
@@ -217,7 +217,7 @@ export default function ResetPasswordPage() {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
               placeholder={t('auth.resetPasswordPage.fields.confirmPasswordPlaceholder')}
               required
               minLength={8}

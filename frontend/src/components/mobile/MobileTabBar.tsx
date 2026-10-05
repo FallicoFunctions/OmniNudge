@@ -136,7 +136,7 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
       {/* Loading bar indicator */}
       {showLoadingBar && (
         <div
-          className="fixed top-0 left-0 right-0 h-1 md:hidden bg-[var(--color-primary)] animate-pulse"
+          className="fixed top-0 left-0 right-0 h-1 md:hidden bg-primary animate-pulse"
           style={{
             zIndex: MOBILE_Z_INDEX.LOADING_BAR,
             boxShadow: '0 0 10px var(--color-primary)',
@@ -145,7 +145,7 @@ export function MobileTabBar({ unreadCount }: MobileTabBarProps) {
       )}
 
       <nav
-        className="fixed bottom-0 left-0 right-0 md:hidden border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_8px_rgba(0,0,0,0.4)]"
+        className="fixed bottom-0 left-0 right-0 md:hidden border-t border-border bg-surface shadow-[0_-2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_-2px_8px_rgba(0,0,0,0.4)]"
         style={{
           zIndex: MOBILE_Z_INDEX.TAB_BAR,
           height: `${MOBILE_SIZES.TAB_BAR_HEIGHT}px`,

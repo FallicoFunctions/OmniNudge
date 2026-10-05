@@ -21,9 +21,7 @@ export function StatusMessage({ children, className = '', variant = 'info' }: St
 
   const content = children ?? defaultMessages[variant];
   if (!content) return null;
-  return (
-    <p className={`mt-3 text-sm text-[var(--color-text-secondary)] ${className}`}>{content}</p>
-  );
+  return <p className={`mt-3 text-sm text-text-secondary ${className}`}>{content}</p>;
 }
 
 export function LoadingMessage({ children, className = '' }: Omit<StatusMessageProps, 'variant'>) {

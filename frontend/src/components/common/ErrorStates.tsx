@@ -39,7 +39,7 @@ export function FormError({ title, message, details, onDismiss }: FormErrorProps
       <div className="flex items-start gap-3">
         {/* Error icon */}
         <svg
-          className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
+          className="w-5 h-5 text-red-600 shrink-0 mt-0.5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -65,7 +65,7 @@ export function FormError({ title, message, details, onDismiss }: FormErrorProps
           <button
             type="button"
             onClick={onDismiss}
-            className="flex-shrink-0 text-red-600 hover:text-red-800"
+            className="shrink-0 text-red-600 hover:text-red-800"
             aria-label={t('common.close')}
           >
             <svg

@@ -589,7 +589,7 @@ export default function CreatePostPage() {
                 <div
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={handleMediaDrop}
-                  className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 text-center transition-all ${
+                  className={`flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-(--color-surface-elevated) px-4 text-center transition-all ${
                     mediaItems.length === 0 ? 'h-[100px]' : 'py-4'
                   }`}
                 >
@@ -604,13 +604,13 @@ export default function CreatePostPage() {
                               {isVideo ? (
                                 <video
                                   src={previewUrl}
-                                  className="w-full h-24 rounded object-cover"
+                                  className="w-full h-24 rounded-sm object-cover"
                                 />
                               ) : (
                                 <img
                                   src={previewUrl}
                                   alt={t('createPostPage.media.uploadedPreviewAlt')}
-                                  className="w-full h-24 rounded object-cover"
+                                  className="w-full h-24 rounded-sm object-cover"
                                 />
                               )}
                               <button
@@ -630,12 +630,12 @@ export default function CreatePostPage() {
                         <button
                           type="button"
                           onClick={() => mediaInputRef.current?.click()}
-                          className="text-[var(--color-primary)] hover:underline"
+                          className="text-primary hover:underline"
                           disabled={isUploadingMedia}
                         >
                           {t('createPostPage.media.actions.addMore')}
                         </button>
-                        <span className="text-[var(--color-text-muted)]">|</span>
+                        <span className="text-(--color-text-muted)">|</span>
                         <button
                           type="button"
                           onClick={clearMediaSelection}
@@ -648,12 +648,12 @@ export default function CreatePostPage() {
                     </>
                   ) : (
                     <>
-                      <div className="text-sm text-[var(--color-text-secondary)]">
+                      <div className="text-sm text-text-secondary">
                         {t('createPostPage.media.actions.dragDropPrefix')}{' '}
                         <button
                           type="button"
                           onClick={() => mediaInputRef.current?.click()}
-                          className="text-[var(--color-primary)] hover:underline font-medium"
+                          className="text-primary hover:underline font-medium"
                           disabled={isUploadingMedia}
                         >
                           {isUploadingMedia

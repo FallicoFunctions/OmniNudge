@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(scriptDir, '../..');
 const runtimeGlb = path.join(projectDir, 'public/assets/avatars/modular-v1/avatar-base.glb');
-const cli = path.join(projectDir, 'node_modules/@gltf-transform/cli/bin/cli.js');
+const cli = path.join(projectDir, 'scripts/transform-asset.mjs');
 const scratch = await mkdtemp(path.join(tmpdir(), 'omnirave-avatar-'));
 const optimized = path.join(scratch, 'avatar-base.glb');
 
@@ -15,19 +15,9 @@ try {
   const before = (await stat(runtimeGlb)).size;
   const result = spawnSync(process.execPath, [
     cli,
-    'optimize',
+    'modular-avatar',
     runtimeGlb,
     optimized,
-    '--compress', 'false',
-    '--flatten', 'false',
-    '--join', 'false',
-    '--instance', 'false',
-    '--palette', 'false',
-    '--prune', 'false',
-    '--simplify', 'false',
-    '--texture-compress', 'webp',
-    '--texture-size', '1024',
-    '--weld', 'false',
   ], { encoding: 'utf8' });
   if (result.error || result.status !== 0) {
     throw new Error(result.stderr || result.stdout || result.error?.message || 'optimization failed');

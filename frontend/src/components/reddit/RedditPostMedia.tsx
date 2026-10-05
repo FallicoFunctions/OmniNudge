@@ -65,7 +65,7 @@ export function RedditPostMedia({
       {embedUrl ? (
         <div className="mb-4 flex flex-col items-start gap-2">
           <div className="relative w-full">
-            <div className="overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200">
+            <div className="overflow-hidden rounded-sm border border-border transition-all duration-200">
               <iframe
                 src={embedUrl}
                 title={decodedTitle}
@@ -80,7 +80,7 @@ export function RedditPostMedia({
       ) : externalVideoUrl ? (
         <div className="mb-4 flex flex-col items-start gap-2">
           <div className="relative w-full">
-            <div className="overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200">
+            <div className="overflow-hidden rounded-sm border border-border transition-all duration-200">
               <video
                 controls
                 className={embedSizing.className}
@@ -96,7 +96,7 @@ export function RedditPostMedia({
         <div className="mb-4 flex flex-col items-start gap-2">
           <div className="relative w-full">
             <div
-              className="cursor-pointer overflow-hidden rounded border border-[var(--color-border)] transition-all duration-200"
+              className="cursor-pointer overflow-hidden rounded-sm border border-border transition-all duration-200"
               onClick={onToggleExpanded}
               title={
                 imageExpanded
@@ -165,7 +165,7 @@ export function RedditPostMedia({
           <button
             type="button"
             onClick={onToggleExpanded}
-            className="text-xs text-[var(--color-primary)] hover:underline"
+            className="text-xs text-primary hover:underline"
           >
             {imageExpanded
               ? t('posts.media.viewer.viewSmaller')
@@ -193,7 +193,7 @@ export function RedditPostMedia({
           <video
             ref={videoRef}
             controls
-            className="w-full max-h-[500px] rounded border border-[var(--color-border)]"
+            className="w-full max-h-[500px] rounded-sm border border-border"
             preload="metadata"
             poster={posterUrl ?? undefined}
             style={
@@ -212,9 +212,9 @@ export function RedditPostMedia({
             {t('posts.media.videoUnsupported')}
           </video>
           {!videoData.hasAudio && (
-            <div className="mt-2 text-xs text-[var(--color-text-muted)] italic">
+            <div className="mt-2 text-xs text-(--color-text-muted) italic">
               {t('posts.media.videoMayNotHaveAudio')}{' '}
-              <span className="text-[var(--color-text-muted)]">
+              <span className="text-(--color-text-muted)">
                 {t('posts.media.watchOnRedditUnavailable')}
               </span>
             </div>

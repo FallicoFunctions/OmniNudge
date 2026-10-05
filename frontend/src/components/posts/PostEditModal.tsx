@@ -47,23 +47,19 @@ export function PostEditModal({
 
       <div className="space-y-4">
         <div className="pr-12">
-          <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            {t('posts.editModal.title')}
-          </h3>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('posts.editModal.subtitle')}
-          </p>
+          <h3 className="text-xl font-semibold text-text-primary">{t('posts.editModal.title')}</h3>
+          <p className="text-sm text-text-secondary">{t('posts.editModal.subtitle')}</p>
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-[var(--color-text-primary)]">
+          <label className="mb-2 block text-sm font-medium text-text-primary">
             {t('posts.editModal.fields.title')}
           </label>
           <input
             type="text"
             value={draftTitle}
             onChange={(event) => setDraftTitle(event.target.value)}
-            className="w-full rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none"
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-primary focus:outline-hidden"
           />
         </div>
 
@@ -81,7 +77,7 @@ export function PostEditModal({
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary hover:text-text-primary disabled:opacity-50"
           >
             {t('common.cancel')}
           </button>
@@ -89,7 +85,7 @@ export function PostEditModal({
             type="button"
             onClick={() => onSave({ title: draftTitle, body: draftBody })}
             disabled={!trimmedTitle || isSaving}
-            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-(--color-primary-strong) disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving
               ? t('posts.editModal.actions.saving')

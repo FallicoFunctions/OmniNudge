@@ -71,16 +71,14 @@ export default function VerifyEmailPage() {
   }, [navigate, t, token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)] px-4">
-      <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-8">
         {status === 'loading' && (
           <div className="text-center">
             <div className="mb-4 flex justify-center">
-              <div className="h-12 w-12 animate-spin rounded-full border-4 border-[var(--color-border)] border-t-[var(--color-primary)]"></div>
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-border border-t-primary"></div>
             </div>
-            <p className="text-[var(--color-text-primary)]">
-              {t('auth.verifyEmailPage.status.verifying')}
-            </p>
+            <p className="text-text-primary">{t('auth.verifyEmailPage.status.verifying')}</p>
           </div>
         )}
 
@@ -101,14 +99,14 @@ export default function VerifyEmailPage() {
                 />
               </svg>
             </div>
-            <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">
+            <h1 className="mb-2 text-2xl font-bold text-text-primary">
               {t('auth.verifyEmailPage.success.title')}
             </h1>
-            <p className="mb-4 text-[var(--color-text-secondary)]">
+            <p className="mb-4 text-text-secondary">
               {t('auth.verifyEmailPage.success.description')}
               {purpose === 'registration' ? ` ${t('auth.verifyEmailPage.success.welcome')}` : null}
             </p>
-            <p className="text-sm text-[var(--color-text-muted)]">
+            <p className="text-sm text-(--color-text-muted)">
               {t('auth.verifyEmailPage.status.redirecting')}
             </p>
           </div>
@@ -131,10 +129,10 @@ export default function VerifyEmailPage() {
                 />
               </svg>
             </div>
-            <h1 className="mb-2 text-2xl font-bold text-[var(--color-text-primary)]">
+            <h1 className="mb-2 text-2xl font-bold text-text-primary">
               {t('auth.verifyEmailPage.error.title')}
             </h1>
-            <p className="mb-6 text-[var(--color-text-secondary)]">{message}</p>
+            <p className="mb-6 text-text-secondary">{message}</p>
             <Button
               variant="primary"
               onClick={() => navigate('/', { replace: true })}

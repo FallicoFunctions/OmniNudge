@@ -48,12 +48,12 @@ export function CallControls({
       <button
         onClick={onToggleMute}
         aria-label={isMuted ? t('calls.unmute') : t('calls.mute')}
-        className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+        className="flex items-center justify-center w-14 h-14 rounded-full bg-(--color-surface-2) hover:bg-(--color-surface-3) transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
       >
         {isMuted ? (
-          <MicOff className="w-6 h-6 text-[var(--color-error)]" />
+          <MicOff className="w-6 h-6 text-(--color-error)" />
         ) : (
-          <Mic className="w-6 h-6 text-[var(--color-text-primary)]" />
+          <Mic className="w-6 h-6 text-text-primary" />
         )}
       </button>
 
@@ -62,12 +62,12 @@ export function CallControls({
         <button
           onClick={onToggleCamera}
           aria-label={isCameraOff ? t('calls.cameraOn') : t('calls.cameraOff')}
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-surface-2)] hover:bg-[var(--color-surface-3)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-(--color-surface-2) hover:bg-(--color-surface-3) transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         >
           {isCameraOff ? (
-            <CameraOff className="w-6 h-6 text-[var(--color-error)]" />
+            <CameraOff className="w-6 h-6 text-(--color-error)" />
           ) : (
-            <Camera className="w-6 h-6 text-[var(--color-text-primary)]" />
+            <Camera className="w-6 h-6 text-text-primary" />
           )}
         </button>
       )}
@@ -95,7 +95,7 @@ export function CallControls({
       <button
         onClick={onEndCall}
         aria-label={t('calls.endCall')}
-        className="flex items-center justify-center w-14 h-14 rounded-full bg-[var(--color-error)] hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
+        className="flex items-center justify-center w-14 h-14 rounded-full bg-(--color-error) hover:opacity-90 transition-opacity focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--color-error)"
       >
         <PhoneOff className="w-6 h-6 text-white" />
       </button>

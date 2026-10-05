@@ -491,24 +491,22 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
       case 'base':
         return (
           <div className="space-y-4">
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {t('themes.editor.base.intro')}
-            </p>
+            <p className="text-sm text-text-secondary">{t('themes.editor.base.intro')}</p>
             <div className="grid gap-4 md:grid-cols-2">
               {!initialTheme && (
                 <button
                   type="button"
                   className={`rounded-xl border p-4 text-left transition ${
                     startFromScratch
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                      : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/60'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/60'
                   }`}
                   onClick={handleStartFromScratch}
                 >
-                  <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-base font-semibold text-text-primary">
                     {t('themes.editor.base.startFromScratch.title')}
                   </p>
-                  <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  <p className="mt-1 text-sm text-text-secondary">
                     {t('themes.editor.base.startFromScratch.description')}
                   </p>
                 </button>
@@ -521,19 +519,15 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                     type="button"
                     className={`rounded-xl border p-4 text-left transition ${
                       isSelected
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                        : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/60'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/60'
                     } ${initialTheme ? 'cursor-not-allowed opacity-70' : ''}`}
                     onClick={() => handleBaseThemeSelect(theme.id)}
                     disabled={Boolean(initialTheme)}
                   >
-                    <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                      {theme.theme_name}
-                    </p>
+                    <p className="text-base font-semibold text-text-primary">{theme.theme_name}</p>
                     {theme.theme_description && (
-                      <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                        {theme.theme_description}
-                      </p>
+                      <p className="mt-1 text-sm text-text-secondary">{theme.theme_description}</p>
                     )}
                   </button>
                 );
@@ -545,12 +539,12 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         return (
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-semibold text-[var(--color-text-primary)]">
+              <label className="text-sm font-semibold text-text-primary">
                 {t('themes.editor.info.nameLabel')}
               </label>
               <input
                 type="text"
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-text-primary focus:border-primary focus:outline-hidden"
                 value={themeName}
                 onChange={(event) => {
                   setThemeName(event.target.value);
@@ -560,17 +554,17 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 }}
                 maxLength={100}
               />
-              <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              <p className="mt-1 text-xs text-text-secondary">
                 {t('themes.editor.info.nameHelper')}
               </p>
               {infoErrors.name && <p className="text-xs text-red-500">{infoErrors.name}</p>}
             </div>
             <div>
-              <label className="text-sm font-semibold text-[var(--color-text-primary)]">
+              <label className="text-sm font-semibold text-text-primary">
                 {t('themes.editor.info.descriptionLabel')}
               </label>
               <textarea
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] px-4 py-2 text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-border px-4 py-2 text-text-primary focus:border-primary focus:outline-hidden"
                 rows={3}
                 value={themeDescription}
                 onChange={(event) => {
@@ -584,12 +578,12 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 <p className="text-xs text-red-500">{infoErrors.description}</p>
               )}
             </div>
-            <label className="flex items-center gap-2 text-sm text-[var(--color-text-primary)]">
+            <label className="flex items-center gap-2 text-sm text-text-primary">
               <input
                 type="checkbox"
                 checked={setAsActive}
                 onChange={(event) => setSetAsActive(event.target.checked)}
-                className="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                className="h-4 w-4 rounded-sm border-border text-primary focus:ring-primary"
               />
               {t('themes.editor.info.setActiveAfterSave')}
             </label>
@@ -607,21 +601,18 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               onChangeVariable={updateVariable}
             />
             <div className="space-y-4">
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-                <p
-                  id={colorPickerLabelId}
-                  className="text-sm font-semibold text-[var(--color-text-primary)]"
-                >
+              <div className="rounded-2xl border border-border bg-(--color-surface-elevated) p-4">
+                <p id={colorPickerLabelId} className="text-sm font-semibold text-text-primary">
                   {activeVariableDefinition?.label ?? t('themes.editor.variables.variableFallback')}
                 </p>
-                <p className="text-xs text-[var(--color-text-secondary)]">
+                <p className="text-xs text-text-secondary">
                   {activeVariableDefinition?.description ??
                     t('themes.editor.variables.descriptionFallback')}
                 </p>
                 <div className="mt-4">
                   <Suspense
                     fallback={
-                      <div className="text-xs text-[var(--color-text-secondary)]">
+                      <div className="text-xs text-text-secondary">
                         {t('themes.editor.variables.loadingColorPicker')}
                       </div>
                     }
@@ -639,7 +630,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   </Suspense>
                 </div>
               </div>
-              <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <div className="rounded-2xl border border-border bg-surface p-4">
                 <ThemePreview variables={debouncedCssVariables} />
               </div>
             </div>
@@ -649,24 +640,24 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         return (
           <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
             <div className="space-y-4">
-              <div className="rounded-xl border border-[var(--color-border)] p-4">
-                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              <div className="rounded-xl border border-border p-4">
+                <h4 className="text-sm font-semibold text-text-primary">
                   {t('themes.editor.review.summaryTitle')}
                 </h4>
-                <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                <p className="mt-2 text-sm text-text-secondary">
+                  <span className="font-semibold text-text-primary">
                     {t('themes.editor.review.labels.name')}
                   </span>{' '}
                   {themeName || t('themes.editor.review.fallbacks.untitledTheme')}
                 </p>
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                <p className="text-sm text-text-secondary">
+                  <span className="font-semibold text-text-primary">
                     {t('themes.editor.review.labels.description')}
                   </span>{' '}
                   {themeDescription || t('themes.editor.review.fallbacks.noDescription')}
                 </p>
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  <span className="font-semibold text-[var(--color-text-primary)]">
+                <p className="text-sm text-text-secondary">
+                  <span className="font-semibold text-text-primary">
                     {t('themes.editor.review.labels.variables')}
                   </span>{' '}
                   {t('themes.editor.review.variablesDefined', {
@@ -674,8 +665,8 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   })}
                 </p>
               </div>
-              <div className="rounded-xl border border-[var(--color-border)] p-4">
-                <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+              <div className="rounded-xl border border-border p-4">
+                <h4 className="text-sm font-semibold text-text-primary">
                   {t('themes.editor.review.previewPaletteTitle')}
                 </h4>
                 <div className="mt-3 flex flex-wrap gap-3">
@@ -687,10 +678,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                   ].map((variable) => (
                     <div key={variable} className="flex flex-col items-center gap-1 text-center">
                       <span
-                        className="h-10 w-10 rounded-full border border-[var(--color-border)]"
+                        className="h-10 w-10 rounded-full border border-border"
                         style={{ backgroundColor: cssVariables[variable] ?? '#000000' }}
                       />
-                      <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">
+                      <span className="text-[10px] uppercase tracking-wide text-(--color-text-muted)">
                         {variable.replace('--color-', '')}
                       </span>
                     </div>
@@ -716,7 +707,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
                 )}
               </div>
             </div>
-            <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+            <div className="rounded-2xl border border-border bg-surface p-4">
               <ThemePreview variables={debouncedCssVariables} showControls={false} />
             </div>
           </div>
@@ -732,24 +723,22 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-[var(--color-surface)] shadow-2xl">
-        <header className="flex items-start justify-between border-b border-[var(--color-border)] px-6 py-4">
+      <div className="relative flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+        <header className="flex items-start justify-between border-b border-border px-6 py-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <p className="text-xs uppercase tracking-wide text-text-secondary">
               {t('themes.editor.header.kicker')}
             </p>
-            <h3 className="text-2xl font-bold text-[var(--color-text-primary)]">
+            <h3 className="text-2xl font-bold text-text-primary">
               {initialTheme
                 ? t('themes.editor.header.editTitle')
                 : t('themes.editor.header.createTitle')}
             </h3>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {steps[currentStep].description}
-            </p>
+            <p className="text-sm text-text-secondary">{steps[currentStep].description}</p>
           </div>
           <button
             type="button"
-            className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            className="text-sm text-text-secondary hover:text-text-primary"
             onClick={onClose}
             disabled={isSubmitting}
           >
@@ -758,14 +747,14 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex gap-2 border-b border-[var(--color-border)] px-6 py-3">
+          <div className="flex gap-2 border-b border-border px-6 py-3">
             {steps.map((step, index) => (
               <div
                 key={step.id}
                 className={`flex flex-1 flex-col rounded-lg border px-3 py-2 text-xs font-semibold ${
                   index === currentStep
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                    : 'border-transparent bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)]'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-transparent bg-(--color-surface-elevated) text-text-secondary'
                 }`}
               >
                 {t('themes.editor.steps.stepLabel', { number: index + 1 })}
@@ -792,10 +781,10 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
             {renderStepContent()}
           </div>
 
-          <footer className="flex items-center justify-between border-t border-[var(--color-border)] px-6 py-4">
+          <footer className="flex items-center justify-between border-t border-border px-6 py-4">
             <button
               type="button"
-              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] disabled:opacity-60"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text-primary disabled:opacity-60"
               onClick={goToPreviousStep}
               disabled={currentStep === 0 || isSubmitting}
             >
@@ -805,7 +794,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               {currentStep < steps.length - 1 ? (
                 <button
                   type="button"
-                  className="rounded-lg bg-[var(--color-primary)] px-6 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   onClick={goToNextStep}
                   disabled={isSubmitting}
                 >
@@ -814,7 +803,7 @@ const ThemeEditor = ({ isOpen, onClose, initialTheme = null }: ThemeEditorProps)
               ) : (
                 <button
                   type="button"
-                  className="rounded-lg bg-[var(--color-primary)] px-6 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
                 >

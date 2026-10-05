@@ -52,34 +52,27 @@ function PostsSection({
   formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
 }) {
   if (!posts.length) {
-    return (
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        {t('userProfilePage.posts.empty')}
-      </p>
-    );
+    return <p className="text-sm text-text-secondary">{t('userProfilePage.posts.empty')}</p>;
   }
 
   return (
     <div className="space-y-3">
       {posts.map((post) => (
-        <article
-          key={post.id}
-          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-        >
+        <article key={post.id} className="rounded-md border border-border bg-surface">
           <div className="flex gap-3 p-4">
             {post.thumbnail_url && (
               <img
                 src={resolveMediaUrl(post.thumbnail_url)}
                 alt={t('posts.media.previewImageAlt', { title: post.title })}
-                className="h-24 w-24 flex-shrink-0 rounded-lg object-cover"
+                className="h-24 w-24 shrink-0 rounded-lg object-cover"
               />
             )}
             <div className="flex-1">
-              <div className="text-xs text-[var(--color-text-secondary)]">
+              <div className="text-xs text-text-secondary">
                 <Link
                   to={`/h/${post.hub_name}`}
                   state={linkState}
-                  className="font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                  className="font-semibold text-text-primary hover:text-primary"
                 >
                   {t('common.format.hubPath', { name: post.hub_name })}
                 </Link>
@@ -98,17 +91,17 @@ function PostsSection({
                 </span>
               </div>
               <Link to={getPostUrl(post)} state={linkState}>
-                <h3 className="mt-1 text-base font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)]">
+                <h3 className="mt-1 text-base font-semibold text-text-primary hover:text-primary">
                   {post.title}
                 </h3>
               </Link>
               {post.body && (
                 <PostBodyMarkdown
                   content={post.body}
-                  className="mt-1 text-sm text-[var(--color-text-secondary)]"
+                  className="mt-1 text-sm text-text-secondary"
                 />
               )}
-              <div className="mt-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+              <div className="mt-1.5 text-xs font-medium text-text-secondary">
                 {t('posts.comment', {
                   count: post.comment_count ?? post.num_comments ?? 0,
                   formattedCount: formatNumber(post.comment_count ?? post.num_comments ?? 0),
@@ -138,18 +131,15 @@ function CommentsSection({
   formatTimestampLabel: (timestamp: string | number | Date, useRelativeTime: boolean) => string;
 }) {
   if (!comments.length) {
-    return <p className="text-sm text-[var(--color-text-secondary)]">{t('comments.noComments')}</p>;
+    return <p className="text-sm text-text-secondary">{t('comments.noComments')}</p>;
   }
 
   return (
     <div className="space-y-3">
       {comments.map((comment) => (
-        <article
-          key={comment.id}
-          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
-        >
+        <article key={comment.id} className="rounded-md border border-border bg-surface">
           <div className="p-4">
-            <div className="mb-2 text-xs text-[var(--color-text-secondary)]">
+            <div className="mb-2 text-xs text-text-secondary">
               <Trans
                 i18nKey="userProfilePage.comments.onPost"
                 values={{ id: comment.post_id }}
@@ -158,7 +148,7 @@ function CommentsSection({
                     <Link
                       to={`/posts/${comment.post_id}`}
                       state={linkState}
-                      className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-primary)]"
+                      className="font-medium text-text-primary hover:text-primary"
                     />
                   ),
                 }}
@@ -173,15 +163,12 @@ function CommentsSection({
               <span> · </span>
               <span>{formatTimestampLabel(comment.created_at, useRelativeTime)}</span>
             </div>
-            <MarkdownRenderer
-              content={comment.content}
-              className="text-sm text-[var(--color-text-primary)]"
-            />
-            <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+            <MarkdownRenderer content={comment.content} className="text-sm text-text-primary" />
+            <div className="mt-3 pt-3 border-t border-border">
               <Link
                 to={`/posts/${comment.post_id}`}
                 state={linkState}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] hover:underline transition"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-dark hover:underline transition"
               >
                 {t('userProfilePage.actions.viewThread')}
                 <svg
@@ -211,11 +198,7 @@ function CommunitiesSection({ profile, t }: { profile?: UserProfile; t: TFunctio
   const hubs = profile?.moderated_hubs ?? [];
 
   if (hubs.length === 0) {
-    return (
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        {t('userProfilePage.communities.empty')}
-      </p>
-    );
+    return <p className="text-sm text-text-secondary">{t('userProfilePage.communities.empty')}</p>;
   }
 
   return (
@@ -224,13 +207,13 @@ function CommunitiesSection({ profile, t }: { profile?: UserProfile; t: TFunctio
         <Link
           key={hub.id}
           to={`/h/${hub.name}`}
-          className="flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 hover:bg-[var(--color-surface-elevated)] transition group"
+          className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 hover:bg-(--color-surface-elevated) transition group"
         >
-          <span className="text-sm font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-primary)] transition">
+          <span className="text-sm font-semibold text-text-primary group-hover:text-primary transition">
             {t('common.format.hubPath', { name: hub.name })}
           </span>
           {hub.title && (
-            <span className="text-xs text-[var(--color-text-muted)] truncate">{hub.title}</span>
+            <span className="text-xs text-(--color-text-muted) truncate">{hub.title}</span>
           )}
         </Link>
       ))}
@@ -353,28 +336,18 @@ export default function UserActivityPage() {
     }
     if (resolvedActiveTab === 'saved') {
       if (!canViewPrivateTabs)
-        return (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('userProfilePage.private.saved')}
-          </p>
-        );
+        return <p className="text-sm text-text-secondary">{t('userProfilePage.private.saved')}</p>;
       return <SavedItemsView withContainer={false} showHeading={false} className="space-y-4" />;
     }
     if (resolvedActiveTab === 'hidden') {
       if (!canViewPrivateTabs)
-        return (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('userProfilePage.private.hidden')}
-          </p>
-        );
+        return <p className="text-sm text-text-secondary">{t('userProfilePage.private.hidden')}</p>;
       return <HiddenItemsView withContainer={false} showHeading={false} className="space-y-4" />;
     }
     if (resolvedActiveTab === 'subscribed') {
       if (!canViewPrivateTabs)
         return (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            {t('userProfilePage.private.subscribed')}
-          </p>
+          <p className="text-sm text-text-secondary">{t('userProfilePage.private.subscribed')}</p>
         );
       return <SubscribedView withContainer={false} showHeading={false} className="space-y-4" />;
     }
@@ -387,16 +360,16 @@ export default function UserActivityPage() {
       <div className="mb-6">
         <Link
           to={`/users/${username}`}
-          className="text-sm font-medium text-[var(--color-primary)] hover:underline"
+          className="text-sm font-medium text-primary hover:underline"
         >
           ← {t('userProfilePage.activityPage.backToProfile')}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">
+        <h1 className="mt-1 text-2xl font-bold text-text-primary">
           {t('userProfilePage.activityPage.title', { username })}
         </h1>
       </div>
 
-      <div className="border-b border-[var(--color-border)] mb-4">
+      <div className="border-b border-border mb-4">
         <div className="-mb-px flex gap-1 overflow-x-auto">
           {visibleTabs.map((tab) => (
             <button
@@ -405,8 +378,8 @@ export default function UserActivityPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`border-b-2 px-3 py-2 text-sm font-semibold whitespace-nowrap transition ${
                 resolvedActiveTab === tab.key
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
               {t(tab.labelKey)}

@@ -88,7 +88,7 @@ export default function OmniChatMediaAssetView({
     attempt > 0 ? `${url}${url.includes('?') ? '&' : '?'}retry=${attempt}` : url;
 
   const badge = (
-    <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 p-2 text-white/80 backdrop-blur">
+    <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/55 p-2 text-white/80 backdrop-blur-sm">
       {isVideo ? <Video size={14} /> : <ImageIcon size={14} />}
     </span>
   );
@@ -146,7 +146,7 @@ export default function OmniChatMediaAssetView({
         )}
         {isVideo && (
           <span className="absolute inset-0 flex items-center justify-center">
-            <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur">
+            <span className="rounded-full bg-black/55 p-3 text-white/90 backdrop-blur-sm">
               <Play size={20} />
             </span>
           </span>

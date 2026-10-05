@@ -111,14 +111,14 @@ export function CommentEntry({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border-b border-[var(--color-border)] p-1">
+    <form onSubmit={handleSubmit} className="border-b border-border p-1">
       <textarea
         ref={textareaRef}
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder || t('comments.addComment')}
-        className="w-full bg-[var(--color-background)] text-xs text-[var(--color-text)] placeholder-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-2 py-1 resize-none focus:outline-none focus:border-cyan-500 min-h-[24px]"
+        className="w-full bg-background text-xs text-(--color-text) placeholder-(--color-text-muted) border border-border rounded-sm px-2 py-1 resize-none focus:outline-hidden focus:border-cyan-500 min-h-[24px]"
         rows={1}
         disabled={isSubmitting}
       />
@@ -127,7 +127,7 @@ export function CommentEntry({
         <button
           type="submit"
           disabled={!content.trim() || isSubmitting}
-          className="text-[10px] bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-2 py-0.5 rounded transition-colors"
+          className="text-[10px] bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-2 py-0.5 rounded-sm transition-colors"
         >
           {isSubmitting ? t('comments.status.posting') : t('comments.actions.post')}
         </button>
@@ -135,7 +135,7 @@ export function CommentEntry({
           <button
             type="button"
             onClick={onCancel}
-            className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+            className="text-[10px] text-(--color-text-muted) hover:text-(--color-text) transition-colors"
           >
             {t('common.cancel')}
           </button>

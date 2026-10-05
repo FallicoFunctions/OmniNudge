@@ -11,7 +11,7 @@ export function LanguageSelector() {
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-semibold text-[var(--color-text-primary)]">
+      <label className="block text-sm font-semibold text-text-primary">
         {t('settings.language_label')}
       </label>
       <select
@@ -19,7 +19,7 @@ export function LanguageSelector() {
         onChange={(e) =>
           handleLanguageChange(e.target.value as (typeof LANGUAGE_OPTIONS)[number]['code'])
         }
-        className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+        className="w-full px-3 py-2 border border-border rounded-sm bg-(--color-surface-elevated) text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
       >
         {LANGUAGE_OPTIONS.map((lang) => (
           <option key={lang.code} value={lang.code}>
@@ -27,8 +27,8 @@ export function LanguageSelector() {
           </option>
         ))}
       </select>
-      <p className="text-xs text-[var(--color-text-secondary)]">{t('settings.language_help')}</p>
-      <p className="mt-4 text-[10px] text-[var(--color-text-secondary)] opacity-60">
+      <p className="text-xs text-text-secondary">{t('settings.language_help')}</p>
+      <p className="mt-4 text-[10px] text-text-secondary opacity-60">
         {t('settings.language_footer')}
       </p>
     </div>

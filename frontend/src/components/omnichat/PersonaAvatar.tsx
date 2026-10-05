@@ -121,7 +121,7 @@ export default function PersonaAvatar({
         />
       )}
       {!hideOverlay && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
       )}
     </div>
   );

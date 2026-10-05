@@ -101,7 +101,7 @@ export default function OmniChatUpgradeModal({
               return (
                 <article
                   key={plan.key}
-                  className={`relative rounded-[26px] border p-5 sm:p-6 ${emphasized ? 'border-[#5d8fff]/70 bg-[#315ca8]/14 shadow-[0_18px_70px_rgba(49,92,168,.16)]' : 'border-white/10 bg-white/[0.03]'}`}
+                  className={`relative rounded-[26px] border p-5 sm:p-6 ${emphasized ? 'border-[#5d8fff]/70 bg-[#315ca8]/14 shadow-[0_18px_70px_rgba(49,92,168,.16)]' : 'border-white/10 bg-white/3'}`}
                 >
                   {plan.key === 'premium' && (
                     <span className="absolute right-4 top-4 rounded-full bg-[#426fc4] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
@@ -146,7 +146,7 @@ export default function OmniChatUpgradeModal({
                     <button
                       type="button"
                       onClick={() => onChoosePlan(plan.key)}
-                      className="omnichat-touch-target mt-7 w-full rounded-full bg-[#426fc4] px-4 text-sm font-semibold text-white transition hover:bg-[#527fd3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7da8ff]"
+                      className="omnichat-touch-target mt-7 w-full rounded-full bg-[#426fc4] px-4 text-sm font-semibold text-white transition hover:bg-[#527fd3] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7da8ff]"
                     >
                       Choose {plan.name}
                     </button>

@@ -137,7 +137,7 @@ export function OmniChatExploreWorkspace() {
               type="button"
               onClick={() => void exploreQuery.fetchNextPage()}
               disabled={exploreQuery.isFetchingNextPage}
-              className="rounded-full border border-white/15 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white/70 hover:border-white/25 hover:text-white disabled:opacity-40"
+              className="rounded-full border border-white/15 bg-white/4 px-6 py-3 text-sm font-medium text-white/70 hover:border-white/25 hover:text-white disabled:opacity-40"
             >
               {exploreQuery.isFetchingNextPage ? 'Loading…' : 'Load more'}
             </button>
@@ -234,7 +234,7 @@ function OmniChatPublicationCard({
       className={`mb-5 break-inside-avoid overflow-hidden rounded-[28px] border border-white/10 bg-[#15161d]/92 shadow-xl shadow-black/15 ${expanded ? 'mx-auto max-w-4xl' : ''}`}
     >
       <div className="flex items-center gap-3 p-4">
-        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-400/30 to-blue-500/20 text-sm font-semibold text-white">
+        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-linear-to-br from-indigo-400/30 to-blue-500/20 text-sm font-semibold text-white">
           {publication.author.avatar_url ? (
             <img
               src={publication.author.avatar_url}
@@ -255,7 +255,7 @@ function OmniChatPublicationCard({
           <button
             type="button"
             onClick={() => followMutation.mutate(!publication.viewer_following)}
-            className="flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white"
+            className="flex items-center gap-1 rounded-full bg-white/6 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white"
           >
             <UserPlus size={13} />
             {publication.viewer_following ? 'Following' : 'Follow'}
@@ -267,7 +267,7 @@ function OmniChatPublicationCard({
         <OmniChatMediaAssetView
           asset={publication.asset}
           preview={!expanded}
-          className={`${expanded ? 'max-h-[70vh]' : 'aspect-[4/5] max-h-[680px]'} min-h-64 w-full rounded-none`}
+          className={`${expanded ? 'max-h-[70vh]' : 'aspect-4/5 max-h-[680px]'} min-h-64 w-full rounded-none`}
         />
       )}
       {publication.snapshot && (
@@ -370,7 +370,7 @@ function OmniChatPublicationCard({
                 aria-label="Report reason"
                 value={reportReason}
                 onChange={(event) => setReportReason(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-[#15161d] p-3 text-sm text-white outline-none"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-[#15161d] p-3 text-sm text-white outline-hidden"
               >
                 <option value="minor_safety">Minor safety</option>
                 <option value="sexual_content">Sexual content</option>
@@ -391,7 +391,7 @@ function OmniChatPublicationCard({
                 value={reportDetails}
                 onChange={(event) => setReportDetails(event.target.value)}
                 maxLength={1000}
-                className="mt-2 min-h-20 w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm text-white outline-none"
+                className="mt-2 min-h-20 w-full rounded-xl border border-white/10 bg-black/25 p-3 text-sm text-white outline-hidden"
               />
             </label>
             <button
@@ -444,7 +444,7 @@ function PublicationConversation({ publication }: { publication: OmniChatPublica
               <OmniChatMediaAssetView
                 key={asset.id}
                 asset={asset}
-                className="mt-3 max-h-[32rem] min-h-52 w-full"
+                className="mt-3 max-h-128 min-h-52 w-full"
               />
             ))}
           </div>
@@ -513,7 +513,7 @@ export function PublicationComments({ publicationId }: { publicationId: string }
       {isAuthenticated && (
         <>
           {replyingTo && (
-            <div className="mt-4 flex items-center justify-between rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-white/50">
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-white/4 px-3 py-2 text-xs text-white/50">
               Replying to @{replyingTo}
               <button
                 type="button"
@@ -534,7 +534,7 @@ export function PublicationComments({ publicationId }: { publicationId: string }
               maxLength={2000}
               onChange={(event) => setBody(event.target.value)}
               placeholder={replyingTo ? `Reply to @${replyingTo}…` : 'Join the conversation…'}
-              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none"
+              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-hidden"
             />
             <button
               disabled={!body.trim() || addMutation.isPending}
@@ -639,7 +639,7 @@ export function OmniChatPublicationWorkspace() {
   if (!publicationQuery.data)
     return <div className="p-10 text-center text-white/50">Publication not found.</div>;
   return (
-    <div className="min-h-screen bg-[var(--color-background)] px-4 py-7">
+    <div className="min-h-screen bg-background px-4 py-7">
       <OmniChatPublicationCard publication={publicationQuery.data} expanded />
       <PublicationConversation publication={publicationQuery.data} />
       <PublicationComments publicationId={publicationQuery.data.id} />

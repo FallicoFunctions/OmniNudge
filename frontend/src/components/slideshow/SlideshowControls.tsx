@@ -24,14 +24,12 @@ export function SlideshowControls({
 
   return (
     // MSG-3: Improved slideshow controls with better visibility and clarity
-    <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2">
+    <div className="flex items-center gap-3 bg-black/60 backdrop-blur-xs rounded-lg px-4 py-2">
       {/* Auto-advance toggle with label */}
       <button
         onClick={onToggleAutoAdvance}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors ${
-          autoAdvance
-            ? 'bg-[var(--color-primary)] text-white'
-            : 'bg-white/20 text-white hover:bg-white/30'
+          autoAdvance ? 'bg-primary text-white' : 'bg-white/20 text-white hover:bg-white/30'
         }`}
         aria-label={
           autoAdvance
@@ -87,7 +85,7 @@ export function SlideshowControls({
               onClick={() => onChangeInterval(option.value)}
               className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
                 autoAdvanceInterval === option.value
-                  ? 'bg-[var(--color-primary)] text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
               aria-label={t('slideshowControls.aria.setSpeed', { speed: option.label })}

@@ -37,7 +37,7 @@ export function ErrorModal({
         </button>
 
         <div className="flex gap-4 mb-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+          <div className="shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
             <AlertCircle size={24} className="text-red-600 dark:text-red-400" />
           </div>
 
@@ -48,7 +48,7 @@ export function ErrorModal({
         </div>
 
         {details && (
-          <div className="bg-secondary/10 rounded p-3 mb-4">
+          <div className="bg-secondary/10 rounded-sm p-3 mb-4">
             <p className="text-sm text-secondary font-mono">{details}</p>
           </div>
         )}
@@ -56,7 +56,7 @@ export function ErrorModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-border rounded hover:bg-secondary/10"
+            className="flex-1 px-4 py-2 border border-border rounded-sm hover:bg-secondary/10"
           >
             {t('common.close')}
           </button>
@@ -66,7 +66,7 @@ export function ErrorModal({
                 onRetry();
                 onClose();
               }}
-              className="flex-1 px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-sm hover:bg-primary-dark"
             >
               {actionLabelText}
             </button>

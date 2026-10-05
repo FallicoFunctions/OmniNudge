@@ -72,16 +72,16 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex flex-col items-center justify-center min-h-[200px] p-6 text-center">
           <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-2">
+          <h2 className="text-lg font-semibold text-text-primary mb-2">
             {i18n.t('errorBoundary.title')}
           </h2>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          <p className="text-sm text-text-secondary mb-4">
             {this.state.error?.message || i18n.t('errorBoundary.unexpectedError')}
           </p>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[var(--color-primary)] rounded-lg active:opacity-80 transition-opacity"
+            className="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg active:opacity-80 transition-opacity"
           >
             {i18n.t('errorBoundary.reloadPage')}
           </button>

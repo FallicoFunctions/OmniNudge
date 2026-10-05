@@ -406,12 +406,12 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
               <img
                 src={subredditIcon}
                 alt=""
-                className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
+                className="h-12 w-12 shrink-0 rounded-lg object-cover"
                 loading="lazy"
                 decoding="async"
               />
             )}
-            <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
+            <h1 className="text-3xl font-bold text-text-primary">
               {t('redditWikiPage.header.title', { subreddit })}
             </h1>
           </div>
@@ -420,37 +420,37 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
           <div className="flex flex-wrap items-center gap-2">
             <Link
               to={`/r/${subreddit}`}
-              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              className="rounded-md bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium capitalize text-text-primary hover:bg-border"
             >
               {t('home.sort.hot')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
-              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              className="rounded-md bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium capitalize text-text-primary hover:bg-border"
             >
               {t('home.sort.new')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
-              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              className="rounded-md bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium capitalize text-text-primary hover:bg-border"
             >
               {t('home.sort.top')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
-              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              className="rounded-md bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium capitalize text-text-primary hover:bg-border"
             >
               {t('home.sort.rising')}
             </Link>
             <Link
               to={`/r/${subreddit}`}
-              className="rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-medium capitalize text-[var(--color-text-primary)] hover:bg-[var(--color-border)]"
+              className="rounded-md bg-(--color-surface-elevated) px-3 py-2 text-sm font-medium capitalize text-text-primary hover:bg-border"
             >
               {t('home.sort.controversial')}
             </Link>
             <Link
               to={`/r/${subreddit}/wiki/index`}
-              className="rounded-md bg-[var(--color-primary)] px-3 py-2 text-sm font-medium capitalize text-white"
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium capitalize text-white"
             >
               {t('hubPage.controls.wiki')}
             </Link>
@@ -460,11 +460,9 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
       <Panel>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-lg font-semibold capitalize text-[var(--color-text-primary)]">
-            {currentPage}
-          </div>
+          <div className="text-lg font-semibold capitalize text-text-primary">{currentPage}</div>
           {tabLinks.length > 0 && (
-            <div className="inline-flex overflow-hidden rounded-full border border-[var(--color-border)] text-sm">
+            <div className="inline-flex overflow-hidden rounded-full border border-border text-sm">
               {tabLinks.map((tab) => (
                 <Link
                   key={tab.key}
@@ -473,7 +471,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                   className={`px-4 py-1 capitalize ${
                     tab.key === activeTab
                       ? 'bg-[#d4e7ff] font-semibold text-[#0a66c2]'
-                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-secondary,#f4f6fb)]'
+                      : 'text-text-secondary hover:bg-(--color-surface-secondary,#f4f6fb)'
                   }`}
                 >
                   {tab.label}
@@ -486,51 +484,51 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
         {activeTab === 'view' && (
           <div className="lg:clearfix">
             {revisionIndicator && (
-              <div className="mb-4 rounded border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+              <div className="mb-4 rounded-sm border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
                 {t('redditWikiPage.view.revisionBanner', { time: revisionIndicator })}
               </div>
             )}
             {subreddit && subredditAbout && (
               <aside className="mb-4 space-y-4 lg:mb-0 lg:float-right lg:ml-6 lg:w-64">
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <div className="rounded-lg border border-border bg-surface p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                     {t('redditWikiPage.sidebar.aboutTitle')}
                   </div>
-                  <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                  <h3 className="text-lg font-semibold text-text-primary">
                     {t('common.format.subredditPath', { name: subreddit })}
                   </h3>
                   {sidebarDescriptionHtml ? (
                     <div
-                      className="mt-3 text-sm text-[var(--color-text-primary)] reddit-wiki-content"
+                      className="mt-3 text-sm text-text-primary reddit-wiki-content"
                       dangerouslySetInnerHTML={{ __html: sidebarDescriptionHtml }}
                     />
                   ) : (
-                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    <p className="mt-3 text-sm text-text-secondary">
                       {subredditAbout.public_description ||
                         t('subredditAboutPanel.emptyDescription')}
                     </p>
                   )}
                 </div>
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <div className="rounded-lg border border-border bg-surface p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                     {t('redditWikiPage.sidebar.communityTitle')}
                   </div>
-                  <div className="mt-4 space-y-2 text-sm text-[var(--color-text-secondary)]">
+                  <div className="mt-4 space-y-2 text-sm text-text-secondary">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">
+                      <span className="font-semibold text-text-primary">
                         {t('subredditAboutPanel.labels.members')}
                       </span>
-                      <span className="text-[var(--color-text-primary)]">
+                      <span className="text-text-primary">
                         {typeof subredditAbout.subscribers === 'number'
                           ? formatNumber(subredditAbout.subscribers)
                           : '—'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-[var(--color-text-primary)]">
+                      <span className="font-semibold text-text-primary">
                         {t('redditWikiPage.sidebar.labels.online')}
                       </span>
-                      <span className="text-[var(--color-text-primary)]">
+                      <span className="text-text-primary">
                         {typeof subredditAbout.active_user_count === 'number'
                           ? formatNumber(subredditAbout.active_user_count)
                           : '—'}
@@ -538,10 +536,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     </div>
                     {subredditAbout.created_utc && (
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-[var(--color-text-primary)]">
+                        <span className="font-semibold text-text-primary">
                           {t('subredditAboutPanel.labels.created')}
                         </span>
-                        <span className="text-[var(--color-text-primary)]">
+                        <span className="text-text-primary">
                           {formatDate(new Date(subredditAbout.created_utc * 1000), {
                             month: 'short',
                             day: 'numeric',
@@ -557,10 +555,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
             {tocItems.length > 0 && (
               <nav
-                className="mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 lg:mb-0 lg:float-right lg:ml-6 lg:w-64"
+                className="mb-4 rounded-lg border border-border bg-surface p-4 lg:mb-0 lg:float-right lg:ml-6 lg:w-64"
                 aria-label={t('redditWikiPage.toc.ariaLabel')}
               >
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
                   {t('redditWikiPage.toc.title')}
                 </div>
                 <ul className="space-y-1 text-sm">
@@ -568,7 +566,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     <li key={item.id}>
                       <a
                         href={`#${item.id}`}
-                        className="text-[var(--color-link,#0079d3)] hover:underline"
+                        className="text-(--color-link,#0079d3) hover:underline"
                         style={{ marginInlineStart: `${(item.level - minHeadingLevel) * 12}px` }}
                       >
                         {item.text}
@@ -581,7 +579,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
 
             {processedHtml ? (
               <div
-                className="reddit-wiki-content max-w-none text-[var(--color-text-primary)]"
+                className="reddit-wiki-content max-w-none text-text-primary"
                 style={{ fontSize: '14px', lineHeight: '1.6' }}
                 dangerouslySetInnerHTML={{ __html: processedHtml }}
               />
@@ -593,17 +591,17 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
         )}
 
         {activeTab === 'history' && (
-          <div className="border-t border-[var(--color-border)]">
+          <div className="border-t border-border">
             {isCompareMode ? (
               <div className="space-y-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  <div className="text-sm font-semibold text-text-primary">
                     {t('redditWikiPage.history.comparing')}
                   </div>
                   <button
                     type="button"
                     onClick={handleExitCompare}
-                    className="rounded border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-link,#0079d3)]"
+                    className="rounded-sm border border-border px-4 py-2 text-sm font-semibold text-(--color-link,#0079d3)"
                   >
                     {t('redditWikiPage.history.actions.backToHistory')}
                   </button>
@@ -615,7 +613,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     </LoadingMessage>
                   </div>
                 ) : compareIsError ? (
-                  <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  <div className="rounded-sm border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                     {compareError instanceof Error
                       ? compareError.message
                       : t('redditWikiPage.history.errors.unableToLoadSelected')}
@@ -635,15 +633,15 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     </div>
                     {compareDiffRows.length ? (
                       <div className="overflow-x-auto">
-                        <div className="inline-block min-w-full border border-[var(--color-border)]">
+                        <div className="inline-block min-w-full border border-border">
                           {/* Header row */}
-                          <div className="grid grid-cols-2 border-b border-[var(--color-border)] bg-[var(--color-surface-secondary,#f4f6fb)]">
-                            <div className="border-r border-[var(--color-border)] px-2 py-1 text-xs font-semibold text-[var(--color-text-primary)]">
+                          <div className="grid grid-cols-2 border-b border-border bg-(--color-surface-secondary,#f4f6fb)">
+                            <div className="border-r border-border px-2 py-1 text-xs font-semibold text-text-primary">
                               {compareFromMeta?.timestamp
                                 ? formatRelativeTime(new Date(compareFromMeta.timestamp * 1000))
                                 : t('redditWikiPage.history.olderRevision')}
                             </div>
-                            <div className="px-2 py-1 text-xs font-semibold text-[var(--color-text-primary)]">
+                            <div className="px-2 py-1 text-xs font-semibold text-text-primary">
                               {compareToMeta?.timestamp
                                 ? formatRelativeTime(new Date(compareToMeta.timestamp * 1000))
                                 : t('redditWikiPage.history.newerRevision')}
@@ -654,14 +652,14 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                             <div key={index} className="grid grid-cols-2">
                               {/* Left side (old) */}
                               <div
-                                className={`flex border-r border-[var(--color-border)] ${
+                                className={`flex border-r border-border ${
                                   row.type === 'removed' ? 'bg-red-50' : 'bg-white'
                                 }`}
                               >
-                                <div className="w-10 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-secondary,#f4f6fb)] px-1 py-0.5 text-right text-[10px] text-[var(--color-text-secondary)]">
+                                <div className="w-10 shrink-0 border-r border-border bg-(--color-surface-secondary,#f4f6fb) px-1 py-0.5 text-right text-[10px] text-text-secondary">
                                   {row.leftLineNum ?? ''}
                                 </div>
-                                <pre className="flex-1 overflow-x-auto whitespace-pre-wrap break-words px-1 py-0.5 font-mono text-[11px] leading-tight">
+                                <pre className="flex-1 overflow-x-auto whitespace-pre-wrap wrap-break-word px-1 py-0.5 font-mono text-[11px] leading-tight">
                                   {row.leftLine ?? '\u00A0'}
                                 </pre>
                               </div>
@@ -671,10 +669,10 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                                   row.type === 'added' ? 'bg-green-50' : 'bg-white'
                                 }`}
                               >
-                                <div className="w-10 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-secondary,#f4f6fb)] px-1 py-0.5 text-right text-[10px] text-[var(--color-text-secondary)]">
+                                <div className="w-10 shrink-0 border-r border-border bg-(--color-surface-secondary,#f4f6fb) px-1 py-0.5 text-right text-[10px] text-text-secondary">
                                   {row.rightLineNum ?? ''}
                                 </div>
-                                <pre className="flex-1 overflow-x-auto whitespace-pre-wrap break-words px-1 py-0.5 font-mono text-[11px] leading-tight">
+                                <pre className="flex-1 overflow-x-auto whitespace-pre-wrap wrap-break-word px-1 py-0.5 font-mono text-[11px] leading-tight">
                                   {row.rightLine ?? '\u00A0'}
                                 </pre>
                               </div>
@@ -683,7 +681,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center">
+                      <div className="rounded-sm border border-border bg-(--color-surface-secondary,#f7f9fc) p-6 text-center">
                         <EmptyState
                           illustration="noResults"
                           title={t('redditWikiPage.history.noDifferences')}
@@ -695,7 +693,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
               </div>
             ) : (
               <>
-                <div className="hidden grid-cols-[50px_50px_160px_120px_180px_1fr_120px] gap-4 border-b border-[var(--color-border)] py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] md:grid">
+                <div className="hidden grid-cols-[50px_50px_160px_120px_180px_1fr_120px] gap-4 border-b border-border py-3 text-xs font-semibold uppercase tracking-wide text-text-secondary md:grid">
                   <span className="col-span-2 text-center">
                     {t('redditWikiPage.history.headers.compare')}
                   </span>
@@ -724,7 +722,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     return (
                       <div
                         key={revision.id}
-                        className="grid gap-3 border-b border-[var(--color-border)] py-3 text-sm text-[var(--color-text-primary)] md:grid-cols-[50px_50px_160px_120px_180px_1fr_120px]"
+                        className="grid gap-3 border-b border-border py-3 text-sm text-text-primary md:grid-cols-[50px_50px_160px_120px_180px_1fr_120px]"
                       >
                         <div className="flex items-center justify-center">
                           <input
@@ -752,12 +750,12 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                             })}
                           />
                         </div>
-                        <div className="text-[var(--color-text-secondary)]">{revisionTime}</div>
+                        <div className="text-text-secondary">{revisionTime}</div>
                         <div className="font-semibold">
                           {subreddit ? (
                             <Link
                               to={`/r/${subreddit}/wiki/${revision.page}`}
-                              className="text-[var(--color-link,#0079d3)] hover:underline"
+                              className="text-(--color-link,#0079d3) hover:underline"
                             >
                               {revision.page}
                             </Link>
@@ -768,19 +766,17 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         {normalizedAuthorName ? (
                           <Link
                             to={`/user/${normalizedAuthorName}`}
-                            className="truncate font-semibold text-[var(--color-link,#0079d3)] hover:underline"
+                            className="truncate font-semibold text-(--color-link,#0079d3) hover:underline"
                           >
                             {authorName}
                           </Link>
                         ) : (
-                          <div className="truncate text-[var(--color-text-secondary)]">
-                            {authorName}
-                          </div>
+                          <div className="truncate text-text-secondary">{authorName}</div>
                         )}
                         <div className="truncate" title={changeSummary}>
                           {changeSummary}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[var(--color-link,#0079d3)]">
+                        <div className="flex flex-wrap items-center gap-2 text-(--color-link,#0079d3)">
                           <Link
                             to={`/r/${subreddit}/wiki/${currentPage}?revision=${revision.id}`}
                             className="font-semibold hover:underline"
@@ -788,7 +784,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                             {t('redditWikiPage.history.actions.view')}
                           </Link>
                           {revision.revision_hidden && (
-                            <span className="text-xs text-[var(--color-text-secondary)]">
+                            <span className="text-xs text-text-secondary">
                               {t('redditWikiPage.history.hidden')}
                             </span>
                           )}
@@ -797,7 +793,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                     );
                   })
                 ) : (
-                  <p className="py-6 text-sm text-[var(--color-text-secondary)]">
+                  <p className="py-6 text-sm text-text-secondary">
                     {t('redditWikiPage.history.empty')}
                   </p>
                 )}
@@ -824,7 +820,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                           }
                           setSearchParams(params);
                         }}
-                        className="rounded border border-[var(--color-border)] px-4 py-2 font-semibold text-[var(--color-link,#0079d3)]"
+                        className="rounded-sm border border-border px-4 py-2 font-semibold text-(--color-link,#0079d3)"
                       >
                         {t('redditWikiPage.history.actions.newer')}
                       </button>
@@ -837,8 +833,8 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                       disabled={!canCompare}
                       className={`rounded border px-4 py-2 font-semibold ${
                         canCompare
-                          ? 'border-[var(--color-border)] text-[var(--color-link,#0079d3)]'
-                          : 'cursor-not-allowed border-[var(--color-border)] text-[var(--color-text-secondary)] opacity-60'
+                          ? 'border-border text-(--color-link,#0079d3)'
+                          : 'cursor-not-allowed border-border text-text-secondary opacity-60'
                       }`}
                     >
                       {t('redditWikiPage.history.actions.compareSelected')}
@@ -863,7 +859,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                           params.set('after', revisionsData.after || '');
                           setSearchParams(params);
                         }}
-                        className="rounded border border-[var(--color-border)] px-4 py-2 font-semibold text-[var(--color-link,#0079d3)]"
+                        className="rounded-sm border border-border px-4 py-2 font-semibold text-(--color-link,#0079d3)"
                       >
                         {t('redditWikiPage.history.actions.older')}
                       </button>
@@ -876,20 +872,20 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
         )}
 
         {activeTab === 'talk' && (
-          <div className="space-y-4 border-t border-[var(--color-border)] pt-4">
+          <div className="space-y-4 border-t border-border pt-4">
             {discussionsData?.discussions?.length ? (
               discussionsData.discussions.map((discussion) => (
                 <div
                   key={discussion.id}
-                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-4"
+                  className="rounded-lg border border-border bg-(--color-surface-secondary,#f7f9fc) p-4"
                 >
                   <Link
                     to={`/r/${discussion.subreddit}/comments/${discussion.id}`}
-                    className="text-base font-semibold text-[var(--color-link,#0079d3)] hover:underline"
+                    className="text-base font-semibold text-(--color-link,#0079d3) hover:underline"
                   >
                     {discussion.title}
                   </Link>
-                  <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                  <div className="mt-1 text-xs text-text-secondary">
                     {discussion.created_utc
                       ? t('redditWikiPage.talk.postedByOn', {
                           author: discussion.author,
@@ -901,7 +897,7 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                         })
                       : t('redditWikiPage.talk.postedBy', { author: discussion.author })}
                   </div>
-                  <div className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                  <div className="mt-2 text-xs text-text-secondary">
                     {t('posts.comment', {
                       count: discussion.num_comments ?? 0,
                       formattedCount: formatNumber(discussion.num_comments ?? 0),
@@ -915,15 +911,13 @@ export default function RedditWikiPage({ mode = 'view' }: RedditWikiPageProps = 
                 </div>
               ))
             ) : (
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-6 text-center">
-                <p className="text-sm text-[var(--color-text-secondary)]">
-                  {t('redditWikiPage.talk.empty')}
-                </p>
+              <div className="rounded-lg border border-border bg-(--color-surface-secondary,#f7f9fc) p-6 text-center">
+                <p className="text-sm text-text-secondary">{t('redditWikiPage.talk.empty')}</p>
                 {subreddit && (
                   <button
                     type="button"
                     onClick={() => alert(t('redditWikiPage.talk.alertNotSupported'))}
-                    className="mt-4 inline-flex items-center justify-center rounded-full border border-[var(--color-link,#0079d3)] px-4 py-2 text-sm font-semibold text-[var(--color-link,#0079d3)] hover:bg-[var(--color-link,#0079d3)] hover:text-white"
+                    className="mt-4 inline-flex items-center justify-center rounded-full border border-(--color-link,#0079d3) px-4 py-2 text-sm font-semibold text-(--color-link,#0079d3) hover:bg-(--color-link,#0079d3) hover:text-white"
                   >
                     {t('redditWikiPage.talk.actions.submitDiscussion')}
                   </button>
@@ -970,19 +964,19 @@ function RevisionSummaryCard({ title, meta, alignRight = false }: RevisionSummar
 
   return (
     <div
-      className={`rounded border border-[var(--color-border)] bg-[var(--color-surface-secondary,#f7f9fc)] p-4 ${
+      className={`rounded border border-border bg-(--color-surface-secondary,#f7f9fc) p-4 ${
         alignRight ? 'md:text-right' : ''
       }`}
     >
-      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
         {title}
       </div>
       {meta ? (
         <>
           {meta.timestamp && (
-            <div className="mt-1 text-sm font-semibold text-[var(--color-text-primary)]">
+            <div className="mt-1 text-sm font-semibold text-text-primary">
               {formatRelativeTime(new Date(meta.timestamp * 1000))}
-              <span className="ml-1 text-[var(--color-text-secondary)]">
+              <span className="ml-1 text-text-secondary">
                 {t('redditWikiPage.history.absoluteDate', {
                   date: formatDate(new Date(meta.timestamp * 1000), {
                     month: 'short',
@@ -996,23 +990,21 @@ function RevisionSummaryCard({ title, meta, alignRight = false }: RevisionSummar
             </div>
           )}
           {meta.author && (
-            <div className="text-sm text-[var(--color-text-secondary)]">
+            <div className="text-sm text-text-secondary">
               {t('common.format.userPath', {
                 name: meta.author.replace(/^u\//i, '').replace(/^\/+/, '').trim() || meta.author,
               })}
             </div>
           )}
-          {meta.reason && (
-            <div className="mt-2 text-xs text-[var(--color-text-secondary)]">{meta.reason}</div>
-          )}
+          {meta.reason && <div className="mt-2 text-xs text-text-secondary">{meta.reason}</div>}
           {meta.revisionId && (
-            <div className="mt-1 text-[10px] uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <div className="mt-1 text-[10px] uppercase tracking-wide text-text-secondary">
               {t('redditWikiPage.history.revisionId', { id: meta.revisionId })}
             </div>
           )}
         </>
       ) : (
-        <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+        <div className="mt-2 text-sm text-text-secondary">
           {t('redditWikiPage.history.revisionUnavailable')}
         </div>
       )}

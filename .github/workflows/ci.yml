@@ -54,6 +54,10 @@ jobs:
         working-directory: omnirave-babylon
         run: npm ci
 
+      - name: Audit all dependencies
+        working-directory: omnirave-babylon
+        run: npm audit --all --audit-level=low
+
       - name: Run tests
         working-directory: omnirave-babylon
         run: npm test -- --run

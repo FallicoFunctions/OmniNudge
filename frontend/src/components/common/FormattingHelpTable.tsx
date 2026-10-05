@@ -31,11 +31,11 @@ export function FormattingHelpTable() {
   return (
     <table className="w-full border-collapse text-[13px]">
       <thead>
-        <tr className="bg-[#fff9c4] text-[var(--color-text-primary)]">
-          <th className="border border-[var(--color-border)] px-3 py-2 text-left font-semibold italic">
+        <tr className="bg-[#fff9c4] text-text-primary">
+          <th className="border border-border px-3 py-2 text-left font-semibold italic">
             {t('common.formattingHelpTable.youType')}
           </th>
-          <th className="border border-[var(--color-border)] px-3 py-2 text-left font-semibold italic">
+          <th className="border border-border px-3 py-2 text-left font-semibold italic">
             {t('common.formattingHelpTable.youSee')}
           </th>
         </tr>
@@ -43,15 +43,15 @@ export function FormattingHelpTable() {
       <tbody>
         {FORMATTING_EXAMPLES.map((example, index) => (
           <tr key={index} className={`align-top ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-            <td className="border border-[var(--color-border)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-primary)]">
-              <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight bg-gray-100 rounded px-2 py-1">
+            <td className="border border-border px-3 py-2 font-mono text-[11px] text-text-primary">
+              <pre className="m-0 whitespace-pre-wrap text-[11px] leading-tight bg-gray-100 rounded-sm px-2 py-1">
                 {example.input}
               </pre>
             </td>
-            <td className="border border-[var(--color-border)] px-3 py-2">
+            <td className="border border-border px-3 py-2">
               <MarkdownRenderer
                 content={example.output}
-                className="leading-tight text-[var(--color-text-primary)]"
+                className="leading-tight text-text-primary"
               />
             </td>
           </tr>

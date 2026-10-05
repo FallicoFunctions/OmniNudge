@@ -174,19 +174,19 @@ export default function QuickChatDialog({
       ariaDescribedBy="quick-chat-description"
       animation={reduceMotion ? 'none' : 'quick-chat'}
       restoreFocusTo={restoreFocusTo}
-      overlayClassName="!z-[100] !items-end !justify-end !px-0 bg-black/70 backdrop-blur-sm sm:!items-center sm:!justify-center sm:!px-4"
+      overlayClassName="z-100! items-end! justify-end! px-0! bg-black/70 backdrop-blur-xs sm:items-center! sm:justify-center! sm:px-4!"
       className="flex h-[min(calc(100dvh-env(safe-area-inset-top,0px)),760px)] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/10 bg-[#11131c] shadow-[0_30px_100px_rgba(0,0,0,0.65)] sm:h-[min(92dvh,760px)] sm:max-w-xl sm:rounded-[30px]"
     >
       {persona && (
         <>
-          <header className="relative shrink-0 overflow-hidden border-b border-white/[0.08] px-5 pb-5 pt-5 sm:px-6">
+          <header className="relative shrink-0 overflow-hidden border-b border-white/8 px-5 pb-5 pt-5 sm:px-6">
             <div className="absolute inset-0 opacity-20">
               <PersonaAvatar
                 persona={persona}
-                className="h-full w-full !rounded-none blur-2xl scale-110"
+                className="h-full w-full rounded-none! blur-2xl scale-110"
               />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-b from-[#11131c]/55 to-[#11131c]" />
+            <div className="absolute inset-0 bg-linear-to-b from-[#11131c]/55 to-[#11131c]" />
             <div className="relative flex items-center gap-4">
               <div
                 data-quick-chat-shared-avatar="true"
@@ -214,7 +214,7 @@ export default function QuickChatDialog({
                 onClick={handleClose}
                 disabled={isContinuing}
                 aria-label={t('omnichat.quickChat.close')}
-                className="omnichat-touch-target grid shrink-0 place-items-center rounded-full border border-white/10 bg-black/20 text-white/65 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+                className="omnichat-touch-target grid shrink-0 place-items-center rounded-full border border-white/10 bg-black/20 text-white/65 transition hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 disabled:cursor-wait disabled:opacity-40 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-blue-400"
               >
                 <X size={18} />
               </button>
@@ -240,7 +240,7 @@ export default function QuickChatDialog({
               <div className="space-y-4">
                 <div className="flex items-end gap-2.5">
                   <PersonaAvatar persona={persona} className="h-8 w-8 shrink-0 rounded-xl" />
-                  <div className="max-w-[86%] rounded-[22px] rounded-bl-md border border-white/10 bg-white/[0.065] px-4 py-3 text-white/90 shadow-lg">
+                  <div className="max-w-[86%] rounded-[22px] rounded-bl-md border border-white/10 bg-white/6.5 px-4 py-3 text-white/90 shadow-lg">
                     <OmniChatMessageContent content={openingMessage} isAssistant />
                   </div>
                 </div>
@@ -256,7 +256,7 @@ export default function QuickChatDialog({
                 {isGenerating && (
                   <div className="flex items-center gap-2.5 text-xs text-white/45">
                     <PersonaAvatar persona={persona} className="h-8 w-8 shrink-0 rounded-xl" />
-                    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.055] px-4 py-2.5">
+                    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5.5 px-4 py-2.5">
                       <Loader2 size={14} className="animate-spin text-blue-300" />
                       {t('omnichat.quickChat.generating', { name: persona.name })}
                     </div>
@@ -264,12 +264,12 @@ export default function QuickChatDialog({
                 )}
 
                 {generationError && submittedContent && !isGenerating && (
-                  <div className="ml-10 rounded-2xl border border-red-300/15 bg-red-400/[0.08] p-4 text-sm text-red-100">
+                  <div className="ml-10 rounded-2xl border border-red-300/15 bg-red-400/8 p-4 text-sm text-red-100">
                     <p>{t('omnichat.quickChat.generationFailed')}</p>
                     <button
                       type="button"
                       onClick={() => void generateReply(submittedContent)}
-                      className="omnichat-touch-target mt-3 flex items-center gap-2 rounded-full border border-red-200/20 px-3 text-xs font-bold transition hover:bg-red-200/10 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
+                      className="omnichat-touch-target mt-3 flex items-center gap-2 rounded-full border border-red-200/20 px-3 text-xs font-bold transition hover:bg-red-200/10 active:scale-[0.98] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-red-300"
                     >
                       <RotateCcw size={13} />
                       {t('omnichat.quickChat.retry')}
@@ -280,7 +280,7 @@ export default function QuickChatDialog({
                 {assistantReply && (
                   <div className="flex items-end gap-2.5">
                     <PersonaAvatar persona={persona} className="h-8 w-8 shrink-0 rounded-xl" />
-                    <div className="max-w-[86%] rounded-[22px] rounded-bl-md border border-white/10 bg-white/[0.065] px-4 py-3 text-white/90 shadow-lg">
+                    <div className="max-w-[86%] rounded-[22px] rounded-bl-md border border-white/10 bg-white/6.5 px-4 py-3 text-white/90 shadow-lg">
                       <OmniChatMessageContent content={assistantReply} isAssistant />
                     </div>
                   </div>
@@ -289,7 +289,7 @@ export default function QuickChatDialog({
             )}
           </div>
 
-          <footer className="omnichat-safe-bottom shrink-0 border-t border-white/[0.08] bg-black/15 px-4 pt-4 sm:p-5">
+          <footer className="omnichat-safe-bottom shrink-0 border-t border-white/8 bg-black/15 px-4 pt-4 sm:p-5">
             {!submittedContent ? (
               <form onSubmit={handleSubmit} className="flex items-end gap-2.5">
                 <label htmlFor="quick-chat-reply" className="sr-only">
@@ -305,13 +305,13 @@ export default function QuickChatDialog({
                   enterKeyHint="send"
                   maxLength={4000}
                   disabled={!openingMessage}
-                  className="min-h-11 max-h-32 flex-1 resize-none overflow-y-auto rounded-[20px] border border-white/10 bg-white/[0.055] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-blue-400/60 focus:bg-white/[0.075] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 max-h-32 flex-1 resize-none overflow-y-auto rounded-[20px] border border-white/10 bg-white/5.5 px-4 py-3 text-sm text-white outline-hidden transition placeholder:text-white/30 focus:border-blue-400/60 focus:bg-white/7.5 disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={!draft.trim() || !openingMessage}
                   aria-label={t('omnichat.quickChat.send')}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_28px_rgba(37,99,235,0.3)] transition hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-600 text-white shadow-[0_10px_28px_rgba(37,99,235,0.3)] transition hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
                 >
                   <Send size={17} />
                 </button>
@@ -322,7 +322,7 @@ export default function QuickChatDialog({
                   type="button"
                   onClick={() => void handleContinue()}
                   disabled={isContinuing}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-500 active:scale-[0.985] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_34px_rgba(37,99,235,0.28)] transition hover:bg-blue-500 active:scale-[0.985] disabled:cursor-wait disabled:opacity-70 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
                 >
                   {isContinuing ? (
                     <Loader2 size={17} className="animate-spin" />
@@ -349,7 +349,7 @@ export default function QuickChatDialog({
               <button
                 type="button"
                 onClick={() => onResume(existingConversation)}
-                className="omnichat-touch-target mt-3 flex w-full items-center justify-center text-center text-xs font-semibold text-white/50 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+                className="omnichat-touch-target mt-3 flex w-full items-center justify-center text-center text-xs font-semibold text-white/50 transition hover:text-white focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-blue-400"
               >
                 {t('omnichat.quickChat.resumeExisting')}
               </button>

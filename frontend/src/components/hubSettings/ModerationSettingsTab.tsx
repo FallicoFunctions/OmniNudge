@@ -56,36 +56,34 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4">
+        <h2 className="text-xl font-bold text-text-primary mb-4">
           {t('hubSettings.moderation.title')}
         </h2>
-        <p className="text-[var(--color-text-secondary)] mb-6">
-          {t('hubSettings.moderation.subtitle')}
-        </p>
+        <p className="text-text-secondary mb-6">{t('hubSettings.moderation.subtitle')}</p>
       </div>
 
       {/* Spam Filter */}
       <div>
-        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-text-primary mb-2">
           {t('hubSettings.moderation.spamFilter.label')}
         </label>
         <select
           value={spamFilterStrength}
           onChange={(e) => setSpamFilterStrength(e.target.value as SpamFilterStrength)}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
         >
           <option value="low">{t('hubSettings.moderation.spamFilter.options.low')}</option>
           <option value="medium">{t('hubSettings.moderation.spamFilter.options.medium')}</option>
           <option value="high">{t('hubSettings.moderation.spamFilter.options.high')}</option>
         </select>
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           {t('hubSettings.moderation.spamFilter.helper')}
         </p>
       </div>
 
       {/* Banned Words */}
       <div>
-        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-text-primary mb-2">
           {t('hubSettings.moderation.bannedWords.label')}
         </label>
         <textarea
@@ -93,16 +91,16 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           onChange={(e) => setBannedWords(e.target.value)}
           placeholder={t('hubSettings.moderation.bannedWords.placeholder')}
           rows={4}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-mono text-sm"
+          className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary font-mono text-sm"
         />
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           {t('hubSettings.moderation.bannedWords.helper')}
         </p>
       </div>
 
       {/* Account Age Filter */}
       <div>
-        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-text-primary mb-2">
           {t('hubSettings.moderation.accountAge.label')}
         </label>
         <input
@@ -111,16 +109,16 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           onChange={(e) => setNewAccountFilterDays(e.target.value)}
           min={0}
           placeholder={formatNumber(0)}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
         />
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           {t('hubSettings.moderation.accountAge.helper')}
         </p>
       </div>
 
       {/* Minimum Karma */}
       <div>
-        <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+        <label className="block text-sm font-semibold text-text-primary mb-2">
           {t('hubSettings.moderation.karma.label')}
         </label>
         <input
@@ -129,9 +127,9 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
           onChange={(e) => setMinAccountKarma(e.target.value)}
           min={0}
           placeholder={formatNumber(0)}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
         />
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           {t('hubSettings.moderation.karma.helper')}
         </p>
       </div>
@@ -140,7 +138,7 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
       <div>
         <label
           htmlFor="access-cooldown"
-          className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2"
+          className="block text-sm font-semibold text-text-primary mb-2"
         >
           {t('hubSettings.moderation.accessCooldown.label')}
         </label>
@@ -161,32 +159,32 @@ export default function ModerationSettingsTab({ settings, onSave }: Props) {
             min={0}
             max={365}
             placeholder={formatNumber(0)}
-            className="w-32 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-background)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="w-32 px-3 py-2 border border-border rounded-sm bg-background text-text-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
           />
-          <span className="text-sm text-[var(--color-text-secondary)]">
+          <span className="text-sm text-text-secondary">
             {t('hubSettings.moderation.units.days')}
           </span>
         </div>
-        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           {t('hubSettings.moderation.accessCooldown.helper')}
         </p>
-        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+        <p className="text-xs text-(--color-text-muted) mt-0.5">
           {t('hubSettings.moderation.accessCooldown.range')}
         </p>
       </div>
 
       {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded p-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
         <h4 className="font-medium text-blue-900 mb-2">{t('hubSettings.moderation.info.title')}</h4>
         <p className="text-sm text-blue-800">{t('hubSettings.moderation.info.description')}</p>
       </div>
 
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-[var(--color-border)]">
+      <div className="flex justify-end pt-4 border-t border-border">
         <button
           onClick={handleSave}
           disabled={!hasChanges}
-          className="px-6 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {t('hubSettings.common.actions.saveChanges')}
         </button>

@@ -62,19 +62,17 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-xl">
-        <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
-          Configure Top Friends
-        </h3>
+      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-xl">
+        <h3 className="text-base font-semibold text-text-primary">Configure Top Friends</h3>
 
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-2">
             Select friends ({selected.length}/{MAX_TOP_FRIENDS})
           </p>
           {friendsQuery.isLoading ? (
-            <p className="text-sm text-[var(--color-text-secondary)]">Loading friends…</p>
+            <p className="text-sm text-text-secondary">Loading friends…</p>
           ) : friends.length === 0 ? (
-            <p className="text-sm text-[var(--color-text-secondary)]">No friends yet.</p>
+            <p className="text-sm text-text-secondary">No friends yet.</p>
           ) : (
             <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
               {friends.map((f) => {
@@ -86,10 +84,10 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
                     key={f.username}
                     className={`flex items-center gap-3 rounded-md px-3 py-2 transition border ${
                       isSelected
-                        ? 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/30 cursor-pointer'
+                        ? 'bg-primary/10 border-primary/30 cursor-pointer'
                         : isDisabled
                           ? 'border-transparent opacity-40 cursor-not-allowed'
-                          : 'hover:bg-[var(--color-surface-elevated)] border-transparent cursor-pointer'
+                          : 'hover:bg-(--color-surface-elevated) border-transparent cursor-pointer'
                     }`}
                     onClick={() => !isDisabled && toggleFriend(f.username)}
                   >
@@ -97,14 +95,14 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
                       <img
                         src={resolveMediaUrl(f.avatar_url)}
                         alt={f.username}
-                        className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                        className="w-8 h-8 rounded-lg object-cover shrink-0"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-[var(--color-border)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] flex-shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-border flex items-center justify-center text-xs font-semibold text-text-secondary shrink-0">
                         {f.username.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="flex-1 text-sm font-medium text-[var(--color-text-primary)]">
+                    <span className="flex-1 text-sm font-medium text-text-primary">
                       {f.username}
                     </span>
                     {isSelected && (
@@ -115,17 +113,13 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
                           e.stopPropagation();
                           setBestFriend(isBest ? '' : f.username);
                         }}
-                        className={`text-lg transition ${isBest ? 'text-yellow-400' : 'text-[var(--color-text-muted)] hover:text-yellow-400'}`}
+                        className={`text-lg transition ${isBest ? 'text-yellow-400' : 'text-(--color-text-muted) hover:text-yellow-400'}`}
                       >
                         ★
                       </button>
                     )}
                     {isSelected && (
-                      <svg
-                        className="w-4 h-4 text-[var(--color-primary)]"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
+                      <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
                         <path
                           fillRule="evenodd"
                           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -139,12 +133,12 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
             </div>
           )}
           {bestFriend && (
-            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+            <p className="mt-2 text-xs text-text-secondary">
               ★ <span className="font-medium">{bestFriend}</span> is your best friend
             </p>
           )}
           {atMax && (
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+            <p className="mt-2 text-xs text-(--color-text-muted)">
               Maximum of {MAX_TOP_FRIENDS} top friends reached.
             </p>
           )}
@@ -155,7 +149,7 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
             type="button"
             onClick={onCancel}
             disabled={isSaving}
-            className="rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] disabled:opacity-50"
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-(--color-surface-elevated) disabled:opacity-50"
           >
             Cancel
           </button>
@@ -163,7 +157,7 @@ function TopFriendsPicker({ currentConfig, onSave, onCancel, isSaving }: PickerP
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {isSaving ? 'Saving…' : 'Save'}
           </button>
@@ -213,9 +207,9 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
 
   return (
     <>
-      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <div className="rounded-lg border border-border bg-surface p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
             Top Friends
           </h3>
           {isOwnProfile && (
@@ -223,7 +217,7 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
               type="button"
               onClick={() => setIsEditing(true)}
               disabled={isLoading}
-              className="text-xs font-medium text-[var(--color-primary)] hover:underline disabled:opacity-40"
+              className="text-xs font-medium text-primary hover:underline disabled:opacity-40"
             >
               Edit
             </button>
@@ -235,16 +229,14 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
           <div className="grid grid-cols-2 gap-3">
             {[1, 2].map((i) => (
               <div key={i} className="flex flex-col items-center gap-1">
-                <div className="w-12 h-12 rounded-lg bg-[var(--color-surface-elevated)] animate-pulse" />
-                <div className="w-10 h-3 rounded bg-[var(--color-surface-elevated)] animate-pulse" />
+                <div className="w-12 h-12 rounded-lg bg-(--color-surface-elevated) animate-pulse" />
+                <div className="w-10 h-3 rounded-sm bg-(--color-surface-elevated) animate-pulse" />
               </div>
             ))}
           </div>
         ) : friends.length === 0 ? (
           isOwnProfile ? (
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Click Edit to set your top friends.
-            </p>
+            <p className="text-xs text-(--color-text-muted)">Click Edit to set your top friends.</p>
           ) : null
         ) : (
           // Grid: 2 cols for ≤2 friends, 4 cols for more
@@ -260,10 +252,10 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
                     <img
                       src={resolveMediaUrl(friend.avatar_url)}
                       alt={friend.username}
-                      className="w-12 h-12 rounded-lg object-cover border-2 border-[var(--color-border)] group-hover:border-[var(--color-primary)] transition"
+                      className="w-12 h-12 rounded-lg object-cover border-2 border-border group-hover:border-primary transition"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-lg bg-[var(--color-border)] flex items-center justify-center text-sm font-semibold text-[var(--color-text-secondary)] border-2 border-[var(--color-border)] group-hover:border-[var(--color-primary)] transition">
+                    <div className="w-12 h-12 rounded-lg bg-border flex items-center justify-center text-sm font-semibold text-text-secondary border-2 border-border group-hover:border-primary transition">
                       {friend.username.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -276,7 +268,7 @@ export default function TopFriendsSection({ username, isOwnProfile }: Props) {
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-[var(--color-primary)] truncate max-w-[56px] text-center transition">
+                <span className="text-xs font-medium text-text-secondary group-hover:text-primary truncate max-w-[56px] text-center transition">
                   {friend.username}
                 </span>
               </Link>

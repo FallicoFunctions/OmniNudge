@@ -95,7 +95,7 @@ export default function CharacterRouletteButton({
         disabled={eligiblePersonas.length === 0}
         aria-disabled={isShuffling || eligiblePersonas.length === 0}
         aria-busy={isShuffling}
-        className="group flex h-11 items-center gap-2 rounded-full border border-blue-300/30 bg-blue-500/15 px-5 text-sm font-bold text-blue-50 shadow-[0_10px_28px_rgba(37,99,235,0.13)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-blue-200/55 hover:bg-blue-500/25 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed aria-disabled:cursor-wait aria-disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
+        className="group flex h-11 items-center gap-2 rounded-full border border-blue-300/30 bg-blue-500/15 px-5 text-sm font-bold text-blue-50 shadow-[0_10px_28px_rgba(37,99,235,0.13)] backdrop-blur-md transition hover:-translate-y-0.5 hover:border-blue-200/55 hover:bg-blue-500/25 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed aria-disabled:cursor-wait aria-disabled:opacity-60 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-blue-300 focus-visible:outline-offset-2"
       >
         <span className="grid h-4 w-4 place-items-center" aria-hidden="true">
           {isShuffling ? (
@@ -113,7 +113,7 @@ export default function CharacterRouletteButton({
       {revealPersona &&
         createPortal(
           <div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-[#070912]/80 px-5 backdrop-blur-xl animate-fadeIn"
+            className="fixed inset-0 z-90 flex items-center justify-center bg-[#070912]/80 px-5 backdrop-blur-xl animate-fadeIn"
             role="status"
             aria-live="polite"
             aria-atomic="true"

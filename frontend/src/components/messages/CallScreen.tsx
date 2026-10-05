@@ -91,7 +91,7 @@ export function CallScreen({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex flex-col bg-[var(--color-bg)] text-[var(--color-text-primary)]"
+      className="fixed inset-0 z-40 flex flex-col bg-(--color-bg) text-text-primary"
       role="dialog"
       aria-label={isVideo ? t('calls.videoCall') : t('calls.voiceCall')}
     >
@@ -115,7 +115,7 @@ export function CallScreen({
           <div className="flex flex-col items-center gap-4">
             {/* Issue 5: add role="img" and aria-label to avatar */}
             <div
-              className="flex items-center justify-center w-24 h-24 rounded-full bg-[var(--color-primary)] text-white text-4xl font-bold"
+              className="flex items-center justify-center w-24 h-24 rounded-full bg-primary text-white text-4xl font-bold"
               role="img"
               aria-label={t('calls.remoteUserAvatar', { name: remoteName })}
             >
@@ -172,7 +172,7 @@ export function CallScreen({
       </div>
 
       {/* Controls bar */}
-      <div className="flex items-center justify-center p-6 bg-[var(--color-surface)]">
+      <div className="flex items-center justify-center p-6 bg-surface">
         <CallControls
           isMuted={isMuted}
           isCameraOff={isCameraOff}

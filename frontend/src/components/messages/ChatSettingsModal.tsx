@@ -41,11 +41,11 @@ export function ChatSettingsModal({
   if (showRetroConfirm) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
-          <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-2">
+        <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-2xl">
+          <h3 className="text-base font-semibold text-text-primary mb-2">
             {t('messages.autoDelete.applyRetroTitle')}
           </h3>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+          <p className="text-sm text-text-secondary mb-6">
             {t('messages.autoDelete.applyRetroBody')}
           </p>
           <div className="flex flex-col gap-2">
@@ -53,7 +53,7 @@ export function ChatSettingsModal({
               type="button"
               onClick={() => onSave(selectedSeconds, true)}
               disabled={isSaving}
-              className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
               {t('messages.autoDelete.applyToAll')}
             </button>
@@ -61,14 +61,14 @@ export function ChatSettingsModal({
               type="button"
               onClick={() => onSave(selectedSeconds, false)}
               disabled={isSaving}
-              className="w-full rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+              className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-(--color-hover)"
             >
               {t('messages.autoDelete.applyNewOnly')}
             </button>
             <button
               type="button"
               onClick={() => setShowRetroConfirm(false)}
-              className="w-full rounded-md px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
+              className="w-full rounded-md px-4 py-2 text-sm text-(--color-text-muted) hover:bg-(--color-hover)"
             >
               {t('common.cancel')}
             </button>
@@ -80,22 +80,20 @@ export function ChatSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-2xl">
-        <h3 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-2xl">
+        <h3 className="text-base font-semibold text-text-primary mb-1">
           {t('messages.chatSettings')}
         </h3>
-        <p className="text-sm text-[var(--color-text-secondary)] mb-4">
-          {t('messages.autoDelete.description')}
-        </p>
+        <p className="text-sm text-text-secondary mb-4">{t('messages.autoDelete.description')}</p>
 
         {currentDuration === null && (
-          <p className="text-xs text-[var(--color-text-muted)] mb-3">
+          <p className="text-xs text-(--color-text-muted) mb-3">
             {t('messages.autoDelete.usingGlobalDefault')}
           </p>
         )}
 
         <div className="mb-6">
-          <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-3">
+          <label className="block text-sm font-semibold text-text-primary mb-3">
             {t('messages.autoDelete.label')}
           </label>
           <AutoDeleteDurationPicker value={duration} onChange={setDuration} disabled={isSaving} />
@@ -105,7 +103,7 @@ export function ChatSettingsModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-md border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)]"
+            className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-(--color-hover)"
           >
             {t('common.cancel')}
           </button>
@@ -113,7 +111,7 @@ export function ChatSettingsModal({
             type="button"
             onClick={handleSaveClick}
             disabled={!isDirty || isSaving}
-            className="flex-1 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
             {t('common.save')}
           </button>

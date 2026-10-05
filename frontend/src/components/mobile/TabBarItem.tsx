@@ -85,8 +85,8 @@ export function TabBarItem({
       className={`
         relative flex flex-1 flex-col items-center justify-center gap-1 py-2 px-1
         transition-colors duration-150
-        active:bg-[var(--color-hover)]
-        ${active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}
+        active:bg-(--color-hover)
+        ${active ? 'text-primary' : 'text-text-secondary'}
       `}
       style={{ touchAction: 'manipulation' }}
       aria-label={ariaLabel}
@@ -94,9 +94,7 @@ export function TabBarItem({
       data-testid={testId}
     >
       {/* Active indicator - 2px border at TOP of tab bar */}
-      {active && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[var(--color-primary)]" />
-      )}
+      {active && <div className="absolute top-0 left-0 right-0 h-[2px] bg-primary" />}
 
       {/* Icon with badge */}
       <div className="relative flex items-center justify-center w-6 h-6">
@@ -105,7 +103,7 @@ export function TabBarItem({
         {/* Badge - only rendered when count > 0 */}
         {badge !== undefined && badge > 0 && (
           <span
-            className={`absolute -top-1 -right-1 flex items-center justify-center px-1 text-[10px] font-semibold text-white bg-[var(--color-error)] rounded-full ${shouldAnimate ? 'animate-scale-in' : ''}`}
+            className={`absolute -top-1 -right-1 flex items-center justify-center px-1 text-[10px] font-semibold text-white bg-(--color-error) rounded-full ${shouldAnimate ? 'animate-scale-in' : ''}`}
             style={{
               minWidth: `${MOBILE_SIZES.BADGE_SIZE}px`,
               height: `${MOBILE_SIZES.BADGE_SIZE}px`,

@@ -32,11 +32,11 @@ export function VoteButtons({
   };
 
   const scoreColor =
-    score > 0 ? 'text-cyan-500' : score < 0 ? 'text-red-500' : 'text-[var(--color-text-muted)]';
+    score > 0 ? 'text-cyan-500' : score < 0 ? 'text-red-500' : 'text-(--color-text-muted)';
   const upvoteColor =
-    userVote === 1 ? 'text-cyan-500' : 'text-[var(--color-text-muted)] hover:text-cyan-500';
+    userVote === 1 ? 'text-cyan-500' : 'text-(--color-text-muted) hover:text-cyan-500';
   const downvoteColor =
-    userVote === -1 ? 'text-red-500' : 'text-[var(--color-text-muted)] hover:text-red-500';
+    userVote === -1 ? 'text-red-500' : 'text-(--color-text-muted) hover:text-red-500';
 
   if (orientation === 'horizontal') {
     return (

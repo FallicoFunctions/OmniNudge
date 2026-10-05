@@ -154,14 +154,14 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
       isOpen
       onClose={onClose}
       overlayClassName="bg-black/40"
-      className="relative bg-[var(--color-surface-elevated)] rounded-lg shadow-xl max-w-2xl w-full p-6"
+      className="relative bg-(--color-surface-elevated) rounded-lg shadow-xl max-w-2xl w-full p-6"
     >
       {/* MODAL-3: Standard close button */}
       <ModalCloseButton onClose={onClose} />
 
       <div className="mb-4 pr-12">
         <h3 className="text-xl font-semibold">{t('modMailModal.title')}</h3>
-        <p className="text-[var(--color-text-secondary)] text-sm mt-1">
+        <p className="text-text-secondary text-sm mt-1">
           {t('modMailModal.subtitle', { hubName })}
         </p>
       </div>
@@ -178,7 +178,7 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
             onChange={(e) => setSubject(e.target.value)}
             maxLength={300}
             placeholder={t('modMailModal.fields.subject.placeholder')}
-            className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="w-full px-4 py-2 border border-border rounded-lg bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary"
           />
         </div>
 
@@ -192,24 +192,24 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
             onChange={(e) => setMessage(e.target.value)}
             rows={8}
             placeholder={t('modMailModal.fields.message.placeholder')}
-            className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+            className="w-full px-4 py-2 border border-border rounded-lg bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary resize-none"
           />
         </div>
 
         {error && (
-          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3">
+          <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-sm p-3">
             {error}
           </div>
         )}
 
         {encryptionWarning && (
-          <div className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded p-3">
+          <div className="text-amber-700 text-sm bg-amber-50 border border-amber-200 rounded-sm p-3">
             {encryptionWarning}
           </div>
         )}
 
         {success && (
-          <div className="text-green-600 text-sm bg-green-50 border border-green-200 rounded p-3">
+          <div className="text-green-600 text-sm bg-green-50 border border-green-200 rounded-sm p-3">
             {t('modMailModal.success.sent')}
           </div>
         )}
@@ -219,14 +219,14 @@ export function ModMailModal({ hubName, onClose }: ModMailModalProps) {
             type="button"
             onClick={onClose}
             disabled={createMutation.isPending || success}
-            className="px-4 py-2 rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-sm border border-border bg-(--color-surface-elevated) hover:bg-(--color-surface-hover) disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('common.cancel')}
           </button>
           <button
             type="submit"
             disabled={createMutation.isPending || success}
-            className="px-4 py-2 rounded bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-strong)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-sm bg-primary text-white hover:bg-(--color-primary-strong) disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {createMutation.isPending
               ? t('messages.deliveryStatus.sending')

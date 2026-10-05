@@ -130,7 +130,7 @@ export function VoteButtons({
             ${
               userVote === 1
                 ? 'text-orange-500 hover:text-orange-600 scale-110'
-                : 'text-[var(--color-text-secondary)] hover:text-orange-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
+                : 'text-text-secondary hover:text-orange-500 hover:bg-(--color-surface-elevated) hover:scale-105'
             }
             active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
@@ -141,7 +141,7 @@ export function VoteButtons({
         </button>
         <span
           className={`
-            ${scoreSizeClasses[size]} text-[var(--color-text-primary)] min-w-[2ch] text-center
+            ${scoreSizeClasses[size]} text-text-primary min-w-[2ch] text-center
           `}
         >
           {score}
@@ -154,7 +154,7 @@ export function VoteButtons({
             ${
               userVote === -1
                 ? 'text-blue-500 hover:text-blue-600 scale-110'
-                : 'text-[var(--color-text-secondary)] hover:text-blue-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
+                : 'text-text-secondary hover:text-blue-500 hover:bg-(--color-surface-elevated) hover:scale-105'
             }
             active:scale-95
             disabled:opacity-50 disabled:cursor-not-allowed
@@ -189,7 +189,7 @@ export function VoteButtons({
           ${
             userVote === 1
               ? 'text-orange-500 hover:text-orange-600 scale-110'
-              : 'text-[var(--color-text-secondary)] hover:text-orange-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
+              : 'text-text-secondary hover:text-orange-500 hover:bg-(--color-surface-elevated) hover:scale-105'
           }
           active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed
@@ -200,7 +200,7 @@ export function VoteButtons({
       </button>
       <span
         className={`
-          ${scoreSizeClasses[size]} text-[var(--color-text-primary)]
+          ${scoreSizeClasses[size]} text-text-primary
         `}
       >
         {score}
@@ -213,7 +213,7 @@ export function VoteButtons({
           ${
             userVote === -1
               ? 'text-blue-500 hover:text-blue-600 scale-110'
-              : 'text-[var(--color-text-secondary)] hover:text-blue-500 hover:bg-[var(--color-surface-elevated)] hover:scale-105'
+              : 'text-text-secondary hover:text-blue-500 hover:bg-(--color-surface-elevated) hover:scale-105'
           }
           active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed

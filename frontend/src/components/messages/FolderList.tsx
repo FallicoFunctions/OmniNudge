@@ -89,7 +89,7 @@ export function FolderList({
             <button
               type="button"
               onClick={onToggleCollapsed}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={t('messages.folders.expand')}
               title={t('messages.folders.expand')}
             >
@@ -108,7 +108,7 @@ export function FolderList({
       ) : (
         /* Expanded: FOLDERS label on left, ‹ collapse + new folder on right */
         <div className="flex items-center justify-between px-3 py-2.5">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+          <span className="text-xs font-semibold uppercase tracking-wide text-(--color-text-muted)">
             {t('messages.folders.title')}
           </span>
           <div className="flex items-center gap-1">
@@ -116,7 +116,7 @@ export function FolderList({
               <button
                 type="button"
                 onClick={onToggleCollapsed}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label={t('messages.folders.collapse')}
                 title={t('messages.folders.collapse')}
               >
@@ -135,7 +135,7 @@ export function FolderList({
               type="button"
               onClick={onNewFolder}
               disabled={atLimit}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-40"
               aria-label={
                 atLimit ? t('messages.folders.maxFolders') : t('messages.folders.newFolder')
               }
@@ -208,19 +208,19 @@ export function FolderList({
       </div>
 
       {/* Divider */}
-      <div className="mx-2 mb-1 border-t border-[var(--color-border)]" />
+      <div className="mx-2 mb-1 border-t border-border" />
 
       {/* User folders */}
       <div className="flex-1 overflow-y-auto px-1.5 py-1">
         {isLoading
           ? !collapsed && (
-              <p className="px-2 py-1.5 text-xs text-[var(--color-text-muted)]">
+              <p className="px-2 py-1.5 text-xs text-(--color-text-muted)">
                 {t('messages.folders.loading')}
               </p>
             )
           : folders.length === 0
             ? !collapsed && (
-                <p className="px-2 py-3 text-center text-xs text-[var(--color-text-muted)]">
+                <p className="px-2 py-3 text-center text-xs text-(--color-text-muted)">
                   {t('messages.folders.emptyHint')}
                 </p>
               )
@@ -275,7 +275,7 @@ export function FolderList({
                             e.stopPropagation();
                             onEditFolder(folder);
                           }}
-                          className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                          className="flex h-7 w-7 items-center justify-center rounded-sm text-(--color-text-muted) hover:bg-(--color-hover) hover:text-text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
                           aria-label={t('messages.folders.editFolder')}
                           title={t('messages.folders.editFolder')}
                         >
@@ -295,7 +295,7 @@ export function FolderList({
                             e.stopPropagation();
                             onDeleteFolder(folder);
                           }}
-                          className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-text-muted)] hover:bg-[var(--color-error)]/10 hover:text-[var(--color-error)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-error)]"
+                          className="flex h-7 w-7 items-center justify-center rounded-sm text-(--color-text-muted) hover:bg-(--color-error)/10 hover:text-(--color-error) focus:outline-hidden focus-visible:ring-2 focus-visible:ring-(--color-error)"
                           aria-label={t('messages.folders.deleteFolder')}
                           title={t('messages.folders.deleteFolder')}
                         >
@@ -365,15 +365,15 @@ function FolderRow({
       disabled={isDeleting}
       title={collapsed ? label : undefined}
       style={activeBg ? { backgroundColor: activeBg } : undefined}
-      className={`flex w-full items-center rounded-lg py-2 text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:opacity-50 ${
+      className={`flex w-full items-center rounded-lg py-2 text-sm transition-colors duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 ${
         collapsed ? 'justify-center px-2' : `gap-2 pl-2 ${padRight ? 'pr-16' : 'pr-2'}`
       } ${
         active
-          ? 'bg-[var(--color-primary)]/10 font-semibold text-[var(--color-text-primary)]'
-          : 'font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-hover)] hover:text-[var(--color-text-primary)]'
+          ? 'bg-primary/10 font-semibold text-text-primary'
+          : 'font-medium text-text-secondary hover:bg-(--color-hover) hover:text-text-primary'
       }`}
     >
-      <span className="inline-flex flex-shrink-0 items-center leading-none" aria-hidden>
+      <span className="inline-flex shrink-0 items-center leading-none" aria-hidden>
         {isDeleting ? (
           <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
             <circle
@@ -397,7 +397,7 @@ function FolderRow({
           </span>
           {typeof count === 'number' && count > 0 && (
             <span
-              className="flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+              className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
               style={{
                 backgroundColor: color ?? 'var(--color-primary)',
                 color: color ? getContrastColor(color) : '#ffffff',

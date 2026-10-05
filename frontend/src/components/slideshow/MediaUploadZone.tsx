@@ -238,8 +238,8 @@ export function MediaUploadZone({
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
           dragActive
-            ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] bg-opacity-10'
-            : 'border-gray-300 hover:border-[var(--color-primary)]'
+            ? 'border-primary bg-primary-light bg-opacity-10'
+            : 'border-gray-300 hover:border-primary'
         }`}
         onClick={() => fileInputRef.current?.click()}
       >
@@ -268,7 +268,7 @@ export function MediaUploadZone({
             />
           </svg>
           <p className="text-sm text-gray-600">
-            <span className="font-semibold text-[var(--color-primary)]">
+            <span className="font-semibold text-primary">
               {t('mediaUploadZone.instructions.clickToUpload')}
             </span>{' '}
             {t('mediaUploadZone.instructions.orDragAndDrop')}
@@ -284,7 +284,7 @@ export function MediaUploadZone({
 
       {/* Error messages */}
       {errors.length > 0 && (
-        <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
+        <div className="mt-3 bg-red-50 border border-red-200 rounded-sm p-3">
           {errors.map((error, index) => (
             <p key={index} className="text-sm text-red-600">
               {error}
@@ -370,7 +370,7 @@ export function MediaUploadZone({
           <div className="mt-4 flex justify-end">
             <button
               onClick={handleUpload}
-              className="px-6 py-2 bg-[var(--color-primary)] text-white rounded-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
+              className="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors"
             >
               {t('mediaUploadZone.actions.upload', { count: selectedMedia.length })}
             </button>

@@ -261,11 +261,8 @@ export default function RedditUserPage() {
 
     if (isProfileBlocked) {
       return (
-        <article
-          key={`post-${post.id}`}
-          className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-        >
-          <div className="text-sm italic text-[var(--color-text-muted)]">
+        <article key={`post-${post.id}`} className="rounded-md border border-border bg-surface p-4">
+          <div className="text-sm italic text-(--color-text-muted)">
             {t('redditUserPage.blocked')}
           </div>
         </article>
@@ -315,21 +312,21 @@ export default function RedditUserPage() {
     return (
       <article
         key={`comment-${comment.id}`}
-        className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left"
+        className="rounded-md border border-border bg-surface p-4 text-left"
       >
         {isProfileBlocked ? (
-          <div className="text-sm italic text-[var(--color-text-muted)]">
+          <div className="text-sm italic text-(--color-text-muted)">
             {t('redditUserPage.blocked')}
           </div>
         ) : (
           <>
-            <div className="mb-1 text-left text-[11px] text-[var(--color-text-secondary)]">
+            <div className="mb-1 text-left text-[11px] text-text-secondary">
               {t('redditUserPage.commentCard.commentedOn')}{' '}
               {comment.link_title ? (
                 <Link
                   to={fullCommentsLink}
                   state={originState}
-                  className="font-semibold hover:text-[var(--color-primary)]"
+                  className="font-semibold hover:text-primary"
                 >
                   {comment.link_title}
                 </Link>
@@ -341,34 +338,34 @@ export default function RedditUserPage() {
             </div>
             <MarkdownRenderer
               content={comment.body}
-              className="text-left text-sm text-[var(--color-text-primary)]"
+              className="text-left text-sm text-text-primary"
             />
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[var(--color-text-secondary)]">
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-text-secondary">
               <Link
                 to={localPermalink}
                 state={originState}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-text-secondary hover:text-primary"
               >
                 {t('posts.actions.permalink')}
               </Link>
               <Link
                 to={fullCommentsLink}
                 state={originState}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-text-secondary hover:text-primary"
               >
                 {t('redditUserPage.commentCard.actions.context')}
               </Link>
               <Link
                 to={fullCommentsLink}
                 state={originState}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-text-secondary hover:text-primary"
               >
                 {fullCommentsLabel}
               </Link>
               <button
                 type="button"
                 onClick={() => handleShareComment(comment)}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-text-secondary hover:text-primary"
               >
                 {t('posts.share')}
               </button>
@@ -378,7 +375,7 @@ export default function RedditUserPage() {
                   toggleSaveRedditCommentMutation.mutate({ comment, shouldSave: !isSaved })
                 }
                 disabled={toggleSaveRedditCommentMutation.isPending}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                className="text-text-secondary hover:text-primary disabled:opacity-60"
               >
                 {toggleSaveRedditCommentMutation.isPending &&
                 toggleSaveRedditCommentMutation.variables?.comment.id === comment.id
@@ -388,7 +385,7 @@ export default function RedditUserPage() {
                     : t('posts.actions.save')}
               </button>
             </div>
-            <div className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
+            <div className="mt-1 text-[11px] text-text-secondary">
               <span>
                 {t('posts.point', {
                   count: comment.score,
@@ -424,10 +421,10 @@ export default function RedditUserPage() {
     <div className="w-full px-4 py-8">
       <div className="mx-auto flex max-w-[1400px] gap-8">
         <div className="flex-1 space-y-4">
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--color-border)] p-4">
+          <div className="rounded-md border border-border bg-surface">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-4">
               <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
+                <h1 className="text-2xl font-bold text-text-primary">
                   {t('common.format.userPath', { name: username })}
                 </h1>
                 <div className="flex gap-2 text-sm font-semibold uppercase">
@@ -437,8 +434,8 @@ export default function RedditUserPage() {
                       onClick={() => setActiveTab(tab.key)}
                       className={`${
                         activeTab === tab.key
-                          ? 'text-[var(--color-primary)]'
-                          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]'
+                          ? 'text-primary'
+                          : 'text-text-secondary hover:text-primary'
                       }`}
                     >
                       {t(`redditUserPage.tabs.${tab.key}`)}
@@ -453,7 +450,7 @@ export default function RedditUserPage() {
                 className={`text-sm ${
                   isProfileBlocked
                     ? 'text-red-600 hover:text-red-700 hover:underline'
-                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:underline'
+                    : 'text-(--color-text-muted) hover:text-text-secondary hover:underline'
                 }`}
               >
                 {isProfileBlocked
@@ -461,7 +458,7 @@ export default function RedditUserPage() {
                   : t('redditUserPage.block.actions.block')}
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm text-text-secondary">
               <span>{t('redditUserPage.sort.label')}</span>
               {SORT_OPTIONS.map((option) => (
                 <button
@@ -469,8 +466,8 @@ export default function RedditUserPage() {
                   onClick={() => setActiveSort(option)}
                   className={`rounded px-2 py-1 ${
                     activeSort === option
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]'
+                      ? 'bg-primary text-white'
+                      : 'bg-(--color-surface-elevated) text-text-secondary hover:text-primary'
                   }`}
                 >
                   {t(`home.sort.${option}`, { defaultValue: option })}
@@ -484,7 +481,7 @@ export default function RedditUserPage() {
                 </LoadingMessage>
               )}
               {listingQuery.isError && (
-                <div className="rounded border border-red-200 bg-red-50 p-3">
+                <div className="rounded-sm border border-red-200 bg-red-50 p-3">
                   <ErrorMessage className="text-sm text-red-700">
                     {t('redditUserPage.activity.errors.loadFailed')}
                   </ErrorMessage>
@@ -513,7 +510,7 @@ export default function RedditUserPage() {
                     onPrev={handlePrevPage}
                     onNext={handleNextPage}
                     centerContent={
-                      <span className="text-sm text-[var(--color-text-secondary)]">
+                      <span className="text-sm text-text-secondary">
                         {t('redditUserPage.pagination.page', { page: pageHistory.length })}
                       </span>
                     }
@@ -525,43 +522,43 @@ export default function RedditUserPage() {
         </div>
 
         <aside className="w-80 shrink-0 space-y-4">
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+          <div className="rounded-md border border-border bg-surface p-4">
+            <div className="text-lg font-semibold text-text-primary">
               {t('redditUserPage.userDetails.title')}
             </div>
-            <div className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
+            <div className="mt-3 space-y-2 text-sm text-text-secondary">
               <div className="flex justify-between">
                 <span>{t('redditUserPage.userDetails.postKarma')}</span>
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {formatNumber(aboutData?.link_karma ?? 0)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>{t('redditUserPage.userDetails.commentKarma')}</span>
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {formatNumber(aboutData?.comment_karma ?? 0)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>{t('redditUserPage.userDetails.redditAge')}</span>
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {formatAccountAge(t, aboutData?.created_utc)}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+          <div className="rounded-md border border-border bg-surface p-4">
+            <div className="text-lg font-semibold text-text-primary">
               {t('redditUserPage.moderatorOf.title')}
             </div>
             {moderatedData && moderatedData.length > 0 ? (
-              <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-secondary)]">
+              <ul className="mt-3 space-y-2 text-sm text-text-secondary">
                 {moderatedData.map((sub) => (
                   <li key={sub.name}>
                     <Link
                       to={`/r/${sub.name}`}
-                      className="font-semibold text-[var(--color-primary)] hover:underline"
+                      className="font-semibold text-primary hover:underline"
                     >
                       {t('common.format.subredditPath', { name: sub.name })}
                     </Link>
@@ -574,18 +571,18 @@ export default function RedditUserPage() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+              <p className="mt-3 text-sm text-(--color-text-muted)">
                 {t('redditUserPage.moderatorOf.empty')}
               </p>
             )}
           </div>
 
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-            <div className="text-lg font-semibold text-[var(--color-text-primary)]">
+          <div className="rounded-md border border-border bg-surface p-4">
+            <div className="text-lg font-semibold text-text-primary">
               {t('redditUserPage.trophies.title')}
             </div>
             {trophiesData && trophiesData.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-[var(--color-text-secondary)]">
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-text-secondary">
                 {trophiesData.map((trophy) => (
                   <div key={trophy.name} className="flex items-center gap-2">
                     {trophy.icon_url ? (
@@ -594,22 +591,20 @@ export default function RedditUserPage() {
                         alt={trophy.name}
                         loading="lazy"
                         decoding="async"
-                        className="h-10 w-10 rounded"
+                        className="h-10 w-10 rounded-sm"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded bg-[var(--color-border)]" />
+                      <div className="h-10 w-10 rounded-sm bg-border" />
                     )}
                     <div>
-                      <div className="font-semibold text-[var(--color-text-primary)]">
-                        {trophy.name}
-                      </div>
+                      <div className="font-semibold text-text-primary">{trophy.name}</div>
                       {trophy.description && <div>{trophy.description}</div>}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+              <p className="mt-3 text-sm text-(--color-text-muted)">
                 {t('redditUserPage.trophies.empty')}
               </p>
             )}

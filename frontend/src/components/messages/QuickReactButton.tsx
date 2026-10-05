@@ -119,7 +119,7 @@ export function QuickReactButton({
         aria-label={t('messages.reactions.addReaction')}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="pointer-events-none flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-text-muted)] opacity-0 transition hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] group-hover:pointer-events-auto group-hover:opacity-100"
+        className="pointer-events-none flex h-7 w-7 items-center justify-center rounded-full text-(--color-text-muted) opacity-0 transition hover:bg-primary/10 hover:text-primary focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary group-hover:pointer-events-auto group-hover:opacity-100"
         onClick={() => setOpen((v) => !v)}
         disabled={addMutation.isPending}
       >
@@ -133,7 +133,7 @@ export function QuickReactButton({
       >
         <div
           className={[
-            'flex items-center gap-0.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-1 py-0.5 shadow-md',
+            'flex items-center gap-0.5 rounded-full border border-border bg-surface px-1 py-0.5 shadow-md',
             addMutation.isPending ? 'pointer-events-none opacity-60' : '',
           ].join(' ')}
         >
@@ -142,7 +142,7 @@ export function QuickReactButton({
               key={emoji}
               type="button"
               aria-label={t('messages.reactions.reactWithEmoji', { emoji })}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-[var(--color-primary)]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-base transition-transform hover:scale-125 hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
               onClick={() => handlePick(emoji)}
               disabled={addMutation.isPending}
             >

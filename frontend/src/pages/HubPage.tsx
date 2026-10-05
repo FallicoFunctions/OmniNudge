@@ -1148,7 +1148,7 @@ export default function HubsPage() {
             onPostSubmit={handlePostSearchSubmit}
             postDropdownOpen={isSearchDropdownOpen}
             postDropdownContent={
-              <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+              <div className="space-y-2 text-sm text-text-primary">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1168,9 +1168,7 @@ export default function HubsPage() {
                   </label>
                 )}
                 {blockAllNsfw && (
-                  <div className="text-xs text-[var(--color-text-secondary)]">
-                    {t('home.search.nsfwBlocked')}
-                  </div>
+                  <div className="text-xs text-text-secondary">{t('home.search.nsfwBlocked')}</div>
                 )}
               </div>
             }
@@ -1186,8 +1184,8 @@ export default function HubsPage() {
                     onClick={() => handleSortChange(sortOption)}
                     className={`px-4 py-2 text-sm font-semibold ${
                       sort === sortOption
-                        ? 'text-[var(--color-primary)]'
-                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+                        ? 'text-primary'
+                        : 'text-text-secondary hover:text-text-primary'
                     }`}
                   >
                     {t(`home.sort.${sortOption}`)}
@@ -1196,7 +1194,7 @@ export default function HubsPage() {
                 {hasWiki && showHubSidebar && (
                   <Link
                     to={`/h/${hubname}/wiki/index`}
-                    className={`px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]`}
+                    className={`px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary`}
                   >
                     {t('hubPage.controls.wiki')}
                   </Link>
@@ -1204,7 +1202,7 @@ export default function HubsPage() {
                 {(orderedPinnedPosts.length > 0 || effectivePosts.length > 0) && (
                   <button
                     onClick={() => setSlideshowOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-text-secondary hover:text-text-primary"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -1255,7 +1253,7 @@ export default function HubsPage() {
                   onPostSubmit={handlePostSearchSubmit}
                   postDropdownOpen={isSearchDropdownOpen}
                   postDropdownContent={
-                    <div className="space-y-2 text-sm text-[var(--color-text-primary)]">
+                    <div className="space-y-2 text-sm text-text-primary">
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -1275,7 +1273,7 @@ export default function HubsPage() {
                         </label>
                       )}
                       {blockAllNsfw && (
-                        <div className="text-xs text-[var(--color-text-secondary)]">
+                        <div className="text-xs text-text-secondary">
                           {t('home.search.nsfwBlocked')}
                         </div>
                       )}
@@ -1291,13 +1289,13 @@ export default function HubsPage() {
       {(isTopSort || isControversialSort) && (
         <div className="mb-4 mt-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            <span className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
               {t('home.timeRange.label')}
             </span>
             <select
               value={topTimeRange}
               onChange={(event) => setTopTimeRange(event.target.value as TopTimeRange)}
-              className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+              className="rounded-sm border border-border bg-(--color-surface-elevated) px-3 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
             >
               {TOP_TIME_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1312,19 +1310,17 @@ export default function HubsPage() {
                 type="datetime-local"
                 value={customTopStart}
                 onChange={(event) => setCustomTopStart(event.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
               />
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                {t('home.timeRange.to')}
-              </span>
+              <span className="text-xs text-text-secondary">{t('home.timeRange.to')}</span>
               <input
                 type="datetime-local"
                 value={customTopEnd}
                 onChange={(event) => setCustomTopEnd(event.target.value)}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="rounded-sm border border-border bg-(--color-surface-elevated) px-2 py-1 text-sm text-text-primary focus:border-primary focus:outline-hidden"
               />
               {!isCustomRangeValid && (
-                <span className="text-xs text-[var(--color-error)]">
+                <span className="text-xs text-(--color-error)">
                   {t('home.timeRange.selectBothDates')}
                 </span>
               )}
@@ -1365,7 +1361,7 @@ export default function HubsPage() {
                     draggingPinnedId !== null &&
                     orderedPinnedPosts.length > 0 && (
                       <div
-                        className="flex h-10 items-center justify-center rounded border border-dashed border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]"
+                        className="flex h-10 items-center justify-center rounded-sm border border-dashed border-border text-xs text-text-secondary"
                         ref={pinnedDropZoneRef}
                       >
                         {t('hubPage.pins.dropHereToMoveToBottom')}
@@ -1452,14 +1448,12 @@ export default function HubsPage() {
       {deletePostTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
-              {t('modals.delete.title')}
-            </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+            <h3 className="text-lg font-semibold text-text-primary">{t('modals.delete.title')}</h3>
+            <p className="mt-2 text-sm text-text-secondary">
               {t('modals.delete.moderatorMessage')}
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[var(--color-text-secondary)]">
+              <label className="mb-1 block text-xs font-medium text-text-secondary">
                 {t('modals.delete.reasonLabel')}{' '}
                 <span className="text-red-500">{t('modals.delete.reasonRequired')}</span>
               </label>
@@ -1467,7 +1461,7 @@ export default function HubsPage() {
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
                 placeholder={t('modals.delete.reasonPlaceholder')}
-                className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-sm border border-border bg-surface p-2 text-sm text-text-primary focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
                 rows={4}
               />
             </div>
@@ -1477,14 +1471,14 @@ export default function HubsPage() {
                   setDeletePostTarget(null);
                   setDeleteReason('');
                 }}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmDeletePost}
                 disabled={deletePostMutation.isPending || !deleteReason.trim()}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-sm bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
               >
                 {deletePostMutation.isPending
                   ? t('modals.delete.deleting')

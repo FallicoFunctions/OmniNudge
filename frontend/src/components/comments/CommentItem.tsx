@@ -171,14 +171,14 @@ export function CommentItem<T extends LocalCommentBase>({
     <div>
       <div className="flex gap-2">
         {/* Left column: Voting */}
-        <div className="flex flex-col items-center gap-1 text-sm text-[var(--color-text-secondary)] leading-none pt-1">
+        <div className="flex flex-col items-center gap-1 text-sm text-text-secondary leading-none pt-1">
           <button
             onClick={() => handleVote(1)}
             disabled={votePending}
             className={`${
               comment.user_vote === 1
                 ? 'text-orange-500'
-                : 'text-[var(--color-text-secondary)] hover:text-orange-500'
+                : 'text-text-secondary hover:text-orange-500'
             } disabled:opacity-50`}
             title={t('posts.actions.upvote')}
           >
@@ -189,9 +189,7 @@ export function CommentItem<T extends LocalCommentBase>({
             onClick={() => handleVote(-1)}
             disabled={votePending}
             className={`${
-              comment.user_vote === -1
-                ? 'text-blue-500'
-                : 'text-[var(--color-text-secondary)] hover:text-blue-500'
+              comment.user_vote === -1 ? 'text-blue-500' : 'text-text-secondary hover:text-blue-500'
             } disabled:opacity-50`}
             title={t('posts.actions.downvote')}
           >
@@ -201,10 +199,10 @@ export function CommentItem<T extends LocalCommentBase>({
 
         {/* Right column: Content */}
         <div className="flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-transform duration-200"
+              className="text-text-secondary hover:text-primary transition-transform duration-200"
               style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
               title={isCollapsed ? t('comments.actions.expand') : t('comments.actions.collapse')}
               aria-label={
@@ -217,11 +215,11 @@ export function CommentItem<T extends LocalCommentBase>({
             </button>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="font-semibold text-[var(--color-text-primary)] hover:underline"
+              className="font-semibold text-text-primary hover:underline"
             >
               {comment.username}
             </button>
-            <span className="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            <span className="rounded-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
               {t('posts.badges.omni')}
             </span>
             <span>·</span>
@@ -231,7 +229,7 @@ export function CommentItem<T extends LocalCommentBase>({
                   ? 'text-orange-500'
                   : comment.user_vote === -1
                     ? 'text-blue-500'
-                    : 'text-[var(--color-text-primary)]'
+                    : 'text-text-primary'
               }`}
             >
               {pointsLabel}
@@ -239,7 +237,7 @@ export function CommentItem<T extends LocalCommentBase>({
             <span>·</span>
             <span>{formattedTimestamp}</span>
             {isCollapsed && replies.length > 0 && (
-              <span className="ml-2 text-[var(--color-text-muted)]">
+              <span className="ml-2 text-(--color-text-muted)">
                 {t('comments.replyCount', { count: replies.length })}
               </span>
             )}
@@ -258,7 +256,7 @@ export function CommentItem<T extends LocalCommentBase>({
                   <button
                     type="submit"
                     disabled={editPending || !editText.trim()}
-                    className="rounded bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                    className="rounded-sm bg-primary px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                   >
                     {editPending ? t('comments.status.saving') : t('common.save')}
                   </button>
@@ -268,21 +266,18 @@ export function CommentItem<T extends LocalCommentBase>({
                       setIsEditing(false);
                       setEditText(comment.content);
                     }}
-                    className="rounded border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]"
+                    className="rounded-sm border border-border px-3 py-1 text-xs font-semibold text-text-secondary"
                   >
                     {t('common.cancel')}
                   </button>
                 </div>
               </form>
             ) : (
-              <MarkdownRenderer
-                content={comment.content}
-                className="mt-1 text-[var(--color-text-primary)]"
-              />
+              <MarkdownRenderer content={comment.content} className="mt-1 text-text-primary" />
             ))}
 
           {!isCollapsed && actionError && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+            <div className="mt-2 rounded-sm border border-red-200 bg-red-50 p-2 text-xs text-red-700">
               {actionError}
             </div>
           )}
@@ -292,7 +287,7 @@ export function CommentItem<T extends LocalCommentBase>({
               {/* Primary action: Reply */}
               <button
                 onClick={() => onReplySelect(comment.id)}
-                className="font-semibold text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition"
+                className="font-semibold text-primary hover:text-primary-dark transition"
               >
                 {t('comments.actions.reply')}
               </button>
@@ -300,14 +295,14 @@ export function CommentItem<T extends LocalCommentBase>({
               {/* Secondary actions: Save, Edit, Inbox toggle */}
               <button
                 onClick={() => navigate(`/users/${encodeURIComponent(comment.username)}`)}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                className="text-text-secondary hover:text-primary"
               >
                 {t('comments.actions.viewProfile')}
               </button>
               <button
                 onClick={handleToggleSave}
                 disabled={savePending}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                className="text-text-secondary hover:text-primary disabled:opacity-50"
               >
                 {savePending
                   ? t('comments.status.saving')
@@ -319,14 +314,14 @@ export function CommentItem<T extends LocalCommentBase>({
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"
+                    className="text-text-secondary hover:text-primary"
                   >
                     {t('comments.actions.edit')}
                   </button>
                   <button
                     onClick={handleInboxToggle}
                     disabled={inboxPending}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] disabled:opacity-50"
+                    className="text-text-secondary hover:text-primary disabled:opacity-50"
                   >
                     {inboxDisabled
                       ? t('comments.actions.enableInbox')
@@ -336,12 +331,12 @@ export function CommentItem<T extends LocalCommentBase>({
               )}
 
               {/* Divider before tertiary actions */}
-              <span className="text-[var(--color-border)] select-none">·</span>
+              <span className="text-border select-none">·</span>
 
               {/* Tertiary actions: Permalink, Embed */}
               <button
                 onClick={() => handlers.permalink(comment)}
-                className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                className="text-[11px] text-(--color-text-muted) hover:text-text-secondary"
                 title={t('comments.actions.permalink')}
               >
                 {t('comments.actions.permalink')}
@@ -349,7 +344,7 @@ export function CommentItem<T extends LocalCommentBase>({
               {handlers.embed && (
                 <button
                   onClick={() => handlers.embed?.(comment)}
-                  className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                  className="text-[11px] text-(--color-text-muted) hover:text-text-secondary"
                   title={t('posts.actions.embed')}
                 >
                   {t('posts.actions.embed')}
@@ -357,9 +352,7 @@ export function CommentItem<T extends LocalCommentBase>({
               )}
 
               {/* Divider before destructive actions */}
-              {(canModerate || !isOwner) && (
-                <span className="text-[var(--color-border)] select-none">·</span>
-              )}
+              {(canModerate || !isOwner) && <span className="text-border select-none">·</span>}
 
               {/* Destructive actions: Delete */}
               {canModerate && (
@@ -387,14 +380,14 @@ export function CommentItem<T extends LocalCommentBase>({
                 <button
                   type="submit"
                   disabled={replyPending || !replyText.trim()}
-                  className="rounded-md bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                  className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
                 >
                   {replyPending ? t('comments.status.posting') : t('comments.postReply')}
                 </button>
                 <button
                   type="button"
                   onClick={onCancelReply}
-                  className="rounded-md border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+                  className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-text-secondary hover:bg-(--color-surface-elevated)"
                 >
                   {t('common.cancel')}
                 </button>
@@ -405,7 +398,7 @@ export function CommentItem<T extends LocalCommentBase>({
       </div>
 
       {!isCollapsed && replies.length > 0 && (
-        <div className="ml-6 mt-3 space-y-3 border-l-[3px] border-[var(--color-border)] pl-5">
+        <div className="ml-6 mt-3 space-y-3 border-l-[3px] border-border pl-5">
           {replies.map((reply) => (
             <CommentItem
               key={reply.id}

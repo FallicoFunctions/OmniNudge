@@ -22,11 +22,11 @@ export default function UserFriendsListPage() {
       <div className="mb-6">
         <Link
           to={`/users/${username}`}
-          className="text-sm font-medium text-[var(--color-primary)] hover:underline"
+          className="text-sm font-medium text-primary hover:underline"
         >
           ← {t('userProfilePage.friendsPage.backToProfile')}
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">
+        <h1 className="mt-1 text-2xl font-bold text-text-primary">
           {t('userProfilePage.friendsPage.title', { username })}
         </h1>
       </div>
@@ -36,19 +36,17 @@ export default function UserFriendsListPage() {
       ) : friendsQuery.isError ? (
         <ErrorMessage>{t('userProfilePage.errors.friendsLoadFailed')}</ErrorMessage>
       ) : friends.length === 0 ? (
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          {t('userProfilePage.friendsPage.empty')}
-        </p>
+        <p className="text-sm text-text-secondary">{t('userProfilePage.friendsPage.empty')}</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {friends.map((friend) => (
             <Link
               key={friend.id}
               to={`/users/${friend.username}`}
-              className="flex flex-col items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 hover:border-[var(--color-primary)] transition"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface p-4 hover:border-primary transition"
             >
               <UserAvatar username={friend.username} avatarUrl={friend.avatar_url} size="lg" />
-              <span className="text-sm font-medium text-[var(--color-text-primary)] text-center truncate w-full">
+              <span className="text-sm font-medium text-text-primary text-center truncate w-full">
                 {friend.username}
               </span>
             </Link>

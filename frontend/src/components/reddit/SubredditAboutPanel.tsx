@@ -28,13 +28,13 @@ export default function SubredditAboutPanel({
   const { formatNumber, formatDate } = useFormat();
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
           {t('subredditAboutPanel.title')}
         </h3>
         {about?.over18 && (
-          <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+          <span className="rounded-sm bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
             {t('posts.badges.nsfw')}
           </span>
         )}
@@ -60,9 +60,7 @@ export default function SubredditAboutPanel({
               dangerouslySetInnerHTML={{ __html: sidebarHtml }}
             />
           ) : about.public_description ? (
-            <p className="mt-3 text-sm text-[var(--color-text-primary)]">
-              {about.public_description}
-            </p>
+            <p className="mt-3 text-sm text-text-primary">{about.public_description}</p>
           ) : (
             <EmptyState
               illustration="noData"
@@ -70,9 +68,9 @@ export default function SubredditAboutPanel({
               className="py-6"
             />
           )}
-          <div className="mt-4 space-y-2 text-xs text-[var(--color-text-secondary)]">
+          <div className="mt-4 space-y-2 text-xs text-text-secondary">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {t('subredditAboutPanel.labels.members')}
               </span>
               <span>
@@ -80,7 +78,7 @@ export default function SubredditAboutPanel({
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[var(--color-text-primary)]">
+              <span className="font-semibold text-text-primary">
                 {t('subredditAboutPanel.labels.activeOmniUsers')}
               </span>
               <span>
@@ -89,7 +87,7 @@ export default function SubredditAboutPanel({
             </div>
             {about.created_utc && (
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[var(--color-text-primary)]">
+                <span className="font-semibold text-text-primary">
                   {t('subredditAboutPanel.labels.created')}
                 </span>
                 <span>

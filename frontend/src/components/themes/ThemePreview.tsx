@@ -56,37 +56,37 @@ const ThemePreview = ({
 
   const renderButtonSamples = () => (
     <div
-      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+      className="rounded-2xl border border-border bg-surface"
       style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
     >
-      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <p className="text-xs uppercase tracking-wide text-text-secondary">
         {t('themes.preview.sections.buttons')}
       </p>
       <div className="mt-3 grid gap-2 md:grid-cols-2" style={{ gap: 'var(--spacing-sm)' }}>
         <button
           type="button"
-          className="rounded-lg bg-[var(--color-primary)] font-semibold text-white"
+          className="rounded-lg bg-primary font-semibold text-white"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
           {t('themes.preview.buttons.primary')}
         </button>
         <button
           type="button"
-          className="rounded-lg border border-[var(--color-primary)] font-semibold text-[var(--color-primary)]"
+          className="rounded-lg border border-primary font-semibold text-primary"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
           {t('themes.preview.buttons.secondary')}
         </button>
         <button
           type="button"
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] font-semibold text-[var(--color-text-primary)]"
+          className="rounded-lg border border-border bg-(--color-surface-elevated) font-semibold text-text-primary"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
           {t('themes.preview.buttons.outline')}
         </button>
         <button
           type="button"
-          className="rounded-lg bg-[var(--color-error)]/10 font-semibold text-[var(--color-error)]"
+          className="rounded-lg bg-(--color-error)/10 font-semibold text-(--color-error)"
           style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
         >
           {t('themes.preview.buttons.danger')}
@@ -97,26 +97,26 @@ const ThemePreview = ({
 
   const renderFormSamples = () => (
     <div
-      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+      className="rounded-2xl border border-border bg-surface"
       style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
     >
-      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <p className="text-xs uppercase tracking-wide text-text-secondary">
         {t('themes.preview.sections.formElements')}
       </p>
       <div className="mt-3 flex flex-col" style={{ gap: 'var(--spacing-sm)' }}>
-        <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+        <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           {t('themes.preview.form.projectName')}
           <input
             type="text"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-border bg-background text-sm text-text-primary focus:border-primary focus:outline-hidden"
             style={{ padding: 'var(--spacing-xs) var(--spacing-sm)' }}
             defaultValue={t('themes.preview.form.projectNameDefault')}
           />
         </label>
-        <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+        <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           {t('themes.preview.form.category')}
           <select
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="mt-1 w-full rounded-lg border border-border bg-background text-sm text-text-primary focus:border-primary focus:outline-hidden"
             style={{ padding: 'var(--spacing-xs) var(--spacing-sm)' }}
             defaultValue="design"
           >
@@ -125,11 +125,11 @@ const ThemePreview = ({
             <option value="dev">{t('themes.preview.form.categoryOptions.dev')}</option>
           </select>
         </label>
-        <label className="flex items-center justify-between text-sm text-[var(--color-text-primary)]">
+        <label className="flex items-center justify-between text-sm text-text-primary">
           {t('themes.preview.form.enableBetaAccess')}
           <span className="relative inline-flex items-center">
             <input type="checkbox" defaultChecked className="peer sr-only" />
-            <span className="h-5 w-10 rounded-full bg-[var(--color-border)] transition-all peer-checked:bg-[var(--color-primary)]" />
+            <span className="h-5 w-10 rounded-full bg-border transition-all peer-checked:bg-primary" />
             <span className="absolute left-1 top-1 h-3 w-3 rounded-full bg-white transition-all peer-checked:translate-x-5" />
           </span>
         </label>
@@ -139,10 +139,10 @@ const ThemePreview = ({
 
   const renderStatusBadges = () => (
     <div
-      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+      className="rounded-2xl border border-border bg-surface"
       style={{ padding: 'var(--spacing-md)', borderRadius: 'var(--border-radius-xl)' }}
     >
-      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+      <p className="text-xs uppercase tracking-wide text-text-secondary">
         {t('themes.preview.sections.statusIndicators')}
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2" style={{ gap: 'var(--spacing-sm)' }}>
@@ -162,14 +162,12 @@ const ThemePreview = ({
         ].map((status) => (
           <div
             key={status.id}
-            className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+            className="flex items-center justify-between rounded-xl border border-border bg-(--color-surface-elevated)"
             style={{ padding: 'var(--spacing-sm)', borderRadius: 'var(--border-radius-lg)' }}
           >
             <div>
-              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {status.label}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
+              <p className="text-sm font-semibold text-text-primary">{status.label}</p>
+              <p className="text-xs text-text-secondary">
                 {t('themes.preview.status.updates', {
                   count: 8,
                   formattedCount: formatNumber(8),
@@ -202,7 +200,7 @@ const ThemePreview = ({
 
   const frameContent = (
     <div
-      className={`rounded-3xl border border-[var(--color-border)] bg-[var(--color-background)] p-6 shadow-lg transition-all ${
+      className={`rounded-3xl border border-border bg-background p-6 shadow-lg transition-all ${
         deviceMode === 'mobile' ? 'mx-auto scale-95' : 'scale-100'
       }`}
       style={{
@@ -214,7 +212,7 @@ const ThemePreview = ({
       }}
     >
       <header
-        className="mb-4 flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+        className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-surface"
         style={{
           padding: 'var(--spacing-md)',
           borderRadius: 'var(--border-radius-xl)',
@@ -223,13 +221,13 @@ const ThemePreview = ({
       >
         <div>
           <p
-            className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]"
+            className="text-xs uppercase tracking-wide text-text-secondary"
             aria-label={t('themes.preview.aria.sectionHeading')}
           >
             {t('themes.preview.brandName')}
           </p>
           <p
-            className="font-semibold text-[var(--color-text-primary)]"
+            className="font-semibold text-text-primary"
             style={{ fontSize: 'var(--font-size-lg)' }}
           >
             {t(`themes.preview.pages.${selectedPage}`)}
@@ -241,12 +239,12 @@ const ThemePreview = ({
           aria-label={t('themes.preview.aria.avatarIndicators')}
         >
           <span
-            className="h-8 w-8 rounded-full bg-[var(--color-primary)]/20"
+            className="h-8 w-8 rounded-full bg-primary/20"
             style={{ borderRadius: 'var(--border-radius-lg)' }}
             aria-hidden="true"
           />
           <span
-            className="h-8 w-8 rounded-full bg-[var(--color-success)]/20"
+            className="h-8 w-8 rounded-full bg-(--color-success)/20"
             style={{ borderRadius: 'var(--border-radius-lg)' }}
             aria-hidden="true"
           />
@@ -258,7 +256,7 @@ const ThemePreview = ({
           {[1, 2, 3].map((item) => (
             <article
               key={item}
-              className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
+              className="rounded-2xl border border-border bg-surface shadow-xs"
               style={{
                 padding: 'var(--spacing-lg)',
                 borderRadius: 'var(--border-radius-xl)',
@@ -268,21 +266,18 @@ const ThemePreview = ({
               <div className="flex items-center justify-between">
                 <div>
                   <p
-                    className="font-semibold text-[var(--color-text-primary)]"
+                    className="font-semibold text-text-primary"
                     style={{ fontSize: 'var(--font-size-base)' }}
                   >
                     {t('themes.preview.feed.creator', { index: item })}
                   </p>
-                  <p
-                    className="text-[var(--color-text-secondary)]"
-                    style={{ fontSize: 'var(--font-size-sm)' }}
-                  >
+                  <p className="text-text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                     {t('themes.preview.feed.meta')}
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-full bg-[var(--color-primary)] text-xs font-semibold text-white"
+                  className="rounded-full bg-primary text-xs font-semibold text-white"
                   style={{
                     padding: 'var(--spacing-xs) var(--spacing-sm)',
                     borderRadius: 'var(--border-radius-2xl)',
@@ -293,7 +288,7 @@ const ThemePreview = ({
                 </button>
               </div>
               <p
-                className="text-[var(--color-text-primary)]"
+                className="text-text-primary"
                 style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--font-size-base)' }}
               >
                 {t('themes.preview.feed.quote')}
@@ -303,7 +298,7 @@ const ThemePreview = ({
                 style={{ marginTop: 'var(--spacing-sm)', gap: 'var(--spacing-sm)' }}
               >
                 <span
-                  className="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                  className="rounded-full bg-(--color-surface-elevated) text-xs text-text-secondary"
                   style={{
                     padding: 'var(--spacing-xs) var(--spacing-sm)',
                     borderRadius: 'var(--border-radius-2xl)',
@@ -312,7 +307,7 @@ const ThemePreview = ({
                   {t('themes.preview.feed.sampleTags.design')}
                 </span>
                 <span
-                  className="rounded-full bg-[var(--color-surface-elevated)] text-xs text-[var(--color-text-secondary)]"
+                  className="rounded-full bg-(--color-surface-elevated) text-xs text-text-secondary"
                   style={{
                     padding: 'var(--spacing-xs) var(--spacing-sm)',
                     borderRadius: 'var(--border-radius-2xl)',
@@ -329,7 +324,7 @@ const ThemePreview = ({
       {selectedPage === 'profile' && (
         <div className="flex flex-col" style={{ gap: 'var(--spacing-lg)' }}>
           <div
-            className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+            className="rounded-2xl border border-border bg-surface"
             style={{
               padding: 'var(--spacing-lg)',
               borderRadius: 'var(--border-radius-2xl)',
@@ -339,20 +334,17 @@ const ThemePreview = ({
           >
             <div className="flex items-center" style={{ gap: 'var(--spacing-sm)' }}>
               <span
-                className="h-14 w-14 bg-[var(--color-primary)]/20"
+                className="h-14 w-14 bg-primary/20"
                 style={{ borderRadius: 'var(--border-radius-2xl)' }}
               />
               <div>
                 <p
-                  className="font-semibold text-[var(--color-text-primary)]"
+                  className="font-semibold text-text-primary"
                   style={{ fontSize: 'var(--font-size-xl)' }}
                 >
                   {t('themes.preview.profile.name')}
                 </p>
-                <p
-                  className="text-[var(--color-text-secondary)]"
-                  style={{ fontSize: 'var(--font-size-sm)' }}
-                >
+                <p className="text-text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                   {t('themes.preview.profile.subtitle', {
                     formattedCount: formatNumber(12000, { notation: 'compact' }),
                   })}
@@ -360,7 +352,7 @@ const ThemePreview = ({
               </div>
               <button
                 type="button"
-                className="ml-auto rounded-full border border-[var(--color-border)] text-xs font-semibold text-[var(--color-text-primary)]"
+                className="ml-auto rounded-full border border-border text-xs font-semibold text-text-primary"
                 style={{
                   padding: 'var(--spacing-xs) var(--spacing-md)',
                   borderRadius: 'var(--border-radius-2xl)',
@@ -373,7 +365,7 @@ const ThemePreview = ({
               </button>
             </div>
             <p
-              className="text-[var(--color-text-secondary)]"
+              className="text-text-secondary"
               style={{ marginTop: 'var(--spacing-sm)', fontSize: 'var(--font-size-base)' }}
             >
               {t('themes.preview.profile.bio')}
@@ -387,18 +379,18 @@ const ThemePreview = ({
             {(['posts', 'themes', 'reactions'] as const).map((key) => (
               <div
                 key={key}
-                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-center"
+                className="rounded-xl border border-border bg-surface text-center"
                 style={{
                   padding: 'var(--spacing-md)',
                   borderRadius: 'var(--border-radius-xl)',
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
+                <p className="text-xs uppercase tracking-wide text-text-secondary">
                   {t(`themes.preview.profile.stats.${key}`)}
                 </p>
                 <p
-                  className="font-bold text-[var(--color-text-primary)]"
+                  className="font-bold text-text-primary"
                   style={{ fontSize: 'var(--font-size-lg)' }}
                 >
                   {formatNumber(128)}
@@ -416,9 +408,7 @@ const ThemePreview = ({
               <div
                 key={roomKey}
                 className={`rounded-xl border ${
-                  index === 0
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10'
-                    : 'border-[var(--color-border)] bg-[var(--color-surface)]'
+                  index === 0 ? 'border-primary bg-primary/10' : 'border-border bg-surface'
                 }`}
                 style={{
                   padding: 'var(--spacing-sm)',
@@ -426,15 +416,12 @@ const ThemePreview = ({
                 }}
               >
                 <p
-                  className="font-semibold text-[var(--color-text-primary)]"
+                  className="font-semibold text-text-primary"
                   style={{ fontSize: 'var(--font-size-base)' }}
                 >
                   {t(`themes.preview.messages.rooms.${roomKey}`)}
                 </p>
-                <p
-                  className="text-[var(--color-text-secondary)]"
-                  style={{ fontSize: 'var(--font-size-sm)' }}
-                >
+                <p className="text-text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                   {t('themes.preview.messages.unread', {
                     count: 2,
                     formattedCount: formatNumber(2),
@@ -444,7 +431,7 @@ const ThemePreview = ({
             ))}
           </div>
           <div
-            className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
+            className="rounded-2xl border border-border bg-surface"
             style={{
               padding: 'var(--spacing-lg)',
               borderRadius: 'var(--border-radius-2xl)',
@@ -452,24 +439,21 @@ const ThemePreview = ({
             }}
           >
             <div
-              className="flex items-center border-b border-[var(--color-border)] pb-3"
+              className="flex items-center border-b border-border pb-3"
               style={{ gap: 'var(--spacing-sm)', paddingBottom: 'var(--spacing-sm)' }}
             >
               <span
-                className="h-10 w-10 rounded-full bg-[var(--color-primary)]/20"
+                className="h-10 w-10 rounded-full bg-primary/20"
                 style={{ borderRadius: 'var(--border-radius-2xl)' }}
               />
               <div>
                 <p
-                  className="font-semibold text-[var(--color-text-primary)]"
+                  className="font-semibold text-text-primary"
                   style={{ fontSize: 'var(--font-size-base)' }}
                 >
                   {t('themes.preview.messages.rooms.designSquad')}
                 </p>
-                <p
-                  className="text-[var(--color-text-secondary)]"
-                  style={{ fontSize: 'var(--font-size-sm)' }}
-                >
+                <p className="text-text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                   {t('themes.preview.messages.onlineNow')}
                 </p>
               </div>
@@ -483,7 +467,7 @@ const ThemePreview = ({
               }}
             >
               <p
-                className="w-3/4 rounded-2xl rounded-bl-none border border-[var(--color-border)] bg-[var(--color-background)] text-[var(--color-text-primary)]"
+                className="w-3/4 rounded-2xl rounded-bl-none border border-border bg-background text-text-primary"
                 style={{
                   padding: 'var(--spacing-sm)',
                   fontSize: 'var(--font-size-base)',
@@ -493,7 +477,7 @@ const ThemePreview = ({
                 {t('themes.preview.messages.sample.incoming')}
               </p>
               <p
-                className="ml-auto w-3/4 rounded-2xl rounded-br-none bg-[var(--color-primary)] text-white"
+                className="ml-auto w-3/4 rounded-2xl rounded-br-none bg-primary text-white"
                 style={{
                   padding: 'var(--spacing-sm)',
                   fontSize: 'var(--font-size-base)',
@@ -504,17 +488,14 @@ const ThemePreview = ({
               </p>
             </div>
             <div
-              className="flex items-center rounded-full border border-[var(--color-border)]"
+              className="flex items-center rounded-full border border-border"
               style={{
                 padding: 'var(--spacing-xs) var(--spacing-md)',
                 gap: 'var(--spacing-xs)',
               }}
             >
-              <span className="h-3 w-3 rounded-full bg-[var(--color-primary)]" />
-              <p
-                className="text-[var(--color-text-secondary)]"
-                style={{ fontSize: 'var(--font-size-sm)' }}
-              >
+              <span className="h-3 w-3 rounded-full bg-primary" />
+              <p className="text-text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                 {t('themes.preview.messages.typePlaceholder')}
               </p>
             </div>
@@ -536,8 +517,8 @@ const ThemePreview = ({
                 type="button"
                 className={`rounded-full px-4 py-1 text-sm font-semibold ${
                   selectedPage === option.id
-                    ? 'bg-[var(--color-primary)] text-white'
-                    : 'border border-[var(--color-border)] text-[var(--color-text-primary)]'
+                    ? 'bg-primary text-white'
+                    : 'border border-border text-text-primary'
                 }`}
                 onClick={() => setSelectedPage(option.id)}
               >
@@ -552,8 +533,8 @@ const ThemePreview = ({
                 type="button"
                 className={`rounded-full px-4 py-1 text-xs font-semibold ${
                   deviceMode === option.id
-                    ? 'bg-[var(--color-primary)] text-white'
-                    : 'border border-[var(--color-border)] text-[var(--color-text-primary)]'
+                    ? 'bg-primary text-white'
+                    : 'border border-border text-text-primary'
                 }`}
                 onClick={() => setDeviceMode(option.id)}
               >
@@ -562,7 +543,7 @@ const ThemePreview = ({
             ))}
             <button
               type="button"
-              className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)]"
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-text-primary"
               onClick={() => setIsFullscreen((prev) => !prev)}
             >
               {isFullscreen

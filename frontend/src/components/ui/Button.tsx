@@ -20,16 +20,15 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseStyles =
-    'rounded font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+    'rounded-sm font-medium transition-colors focus:outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantStyles: Record<ButtonVariant, string> = {
-    primary:
-      'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] focus:ring-[var(--color-primary)]',
+    primary: 'bg-primary text-white hover:bg-primary-dark focus:ring-primary',
     secondary:
-      'border border-[var(--color-border)] bg-transparent text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] focus:ring-[var(--color-border)]',
+      'border border-border bg-transparent text-text-primary hover:bg-(--color-surface-elevated) focus:ring-border',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
     ghost:
-      'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] focus:ring-[var(--color-border)]',
+      'bg-transparent text-text-secondary hover:bg-(--color-surface-elevated) focus:ring-border',
   };
 
   const sizeStyles: Record<ButtonSize, string> = {

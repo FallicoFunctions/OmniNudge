@@ -34,7 +34,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-background)]">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <StatusMessage>{t('common.loading')}</StatusMessage>
       </div>
     );

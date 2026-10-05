@@ -80,7 +80,7 @@ export default function AudioPlayer({
   };
 
   return (
-    <div className="w-full rounded border border-[var(--color-border)] p-3">
+    <div className="w-full rounded-sm border border-border p-3">
       <audio
         ref={audioRef}
         src={src}
@@ -103,7 +103,7 @@ export default function AudioPlayer({
         <button
           type="button"
           onClick={handleTogglePlay}
-          className="rounded bg-[var(--color-primary)] px-3 py-1.5 text-xs font-semibold text-white"
+          className="rounded-sm bg-primary px-3 py-1.5 text-xs font-semibold text-white"
           aria-label={isPlaying ? t('messages.media.audio.pause') : t('messages.media.audio.play')}
         >
           {isPlaying ? t('messages.media.audio.pause') : t('messages.media.audio.play')}
@@ -117,18 +117,18 @@ export default function AudioPlayer({
             step={0.1}
             value={Math.min(currentTime, progressMax)}
             onChange={(event) => handleSeek(Number(event.target.value))}
-            className="w-full accent-[var(--color-primary)]"
+            className="w-full accent-primary"
             aria-label={t('messages.media.audio.seek')}
           />
-          <div className="mt-1 text-xs text-[var(--color-text-muted)]">
+          <div className="mt-1 text-xs text-(--color-text-muted)">
             {formatDuration(currentTime)} / {formatDuration(duration)}
           </div>
         </div>
 
-        <label className="text-xs text-[var(--color-text-muted)]">
+        <label className="text-xs text-(--color-text-muted)">
           <span className="sr-only">{t('messages.media.audio.speed')}</span>
           <select
-            className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1"
+            className="rounded-sm border border-border bg-surface px-2 py-1"
             value={playbackRate}
             onChange={(event) => handlePlaybackRate(Number(event.target.value))}
             aria-label={t('messages.media.audio.speed')}
@@ -146,13 +146,13 @@ export default function AudioPlayer({
           target="_blank"
           rel="noopener noreferrer"
           download={fileName}
-          className="rounded border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-center"
+          className="rounded-sm border border-border px-3 py-1.5 text-xs font-semibold text-center"
         >
           {t('common.download')}
         </a>
       </div>
 
-      <div className="mt-2 text-xs text-[var(--color-text-muted)]">{speedLabel}</div>
+      <div className="mt-2 text-xs text-(--color-text-muted)">{speedLabel}</div>
     </div>
   );
 }

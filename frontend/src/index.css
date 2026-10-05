@@ -7,18 +7,83 @@
 /* Import RTL support */
 @import './styles/rtl.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Keep the existing theme/RTL selector precedence in the same cascade as utilities. */
+@import 'tailwindcss/theme.css';
+@import 'tailwindcss/preflight.css';
+@import 'tailwindcss/utilities.css' source(none);
 
-@layer utilities {
-  .hide-scrollbar::-webkit-scrollbar {
+@source './';
+@source '../index.html';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Resolve scoped theme tokens on the element using the utility. */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-dark: var(--color-primary-dark);
+  --color-primary-light: var(--color-primary-light);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-border: var(--color-border);
+}
+
+@theme {
+  --animate-slide-up: slideUp 250ms ease-out;
+  --animate-scale-in: scaleIn 150ms ease-out;
+
+  @keyframes slideUp {
+    0% {
+      transform: translateY(100%);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+  @keyframes scaleIn {
+    0% {
+      transform: scale(0);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+*,
+::after,
+::before,
+::backdrop,
+::file-selector-button {
+  border-color: var(--color-gray-200, currentcolor);
+}
+
+button:not(:disabled),
+[role='button']:not(:disabled) {
+  cursor: pointer;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-gray-400);
+  opacity: 1;
+}
+
+@utility hide-scrollbar {
+  &::-webkit-scrollbar {
     display: none;
   }
-  .hide-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Root CSS Variables - Default Theme */

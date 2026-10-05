@@ -195,7 +195,7 @@ describe('OmniChatCommerceModal', () => {
     );
 
     expect(await screen.findByText(/your call is paused/i)).toBeInTheDocument();
-    expect(screen.getByRole('dialog').parentElement).toHaveClass('z-[110]');
+    expect(screen.getByRole('dialog').parentElement).toHaveClass('z-110');
     expect(onCreditsAdded).not.toHaveBeenCalled();
 
     await waitFor(() => expect(onCreditsAdded).toHaveBeenCalledOnce(), { timeout: 5000 });

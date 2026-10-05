@@ -29,7 +29,7 @@ function BlockState({ block }: { block: AdminOmniChatPersonaBlock }) {
     );
   }
   return (
-    <span className="rounded-full bg-[var(--color-surface)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+    <span className="rounded-full bg-surface px-2.5 py-1 text-xs font-semibold text-text-secondary">
       Lapsed
     </span>
   );
@@ -55,7 +55,7 @@ function BlockTranscript({ block }: { block: AdminOmniChatPersonaBlock }) {
   const turns = block.transcript ?? [];
   if (turns.length === 0) {
     return (
-      <p className="mt-3 text-xs italic text-[var(--color-text-secondary)]">
+      <p className="mt-3 text-xs italic text-text-secondary">
         No exchange was recorded with this block.
       </p>
     );
@@ -63,21 +63,19 @@ function BlockTranscript({ block }: { block: AdminOmniChatPersonaBlock }) {
 
   return (
     <details className="mt-3">
-      <summary className="cursor-pointer text-sm font-medium text-[var(--color-text-secondary)]">
+      <summary className="cursor-pointer text-sm font-medium text-text-secondary">
         What she was reacting to ({turns.length} messages)
       </summary>
-      <ol className="mt-2 space-y-2 border-l-2 border-[var(--color-border)] pl-3">
+      <ol className="mt-2 space-y-2 border-l-2 border-border pl-3">
         {turns.map((turn, index) => (
           <li key={`${block.id}-${index}`} className="text-sm">
             <span className="font-semibold">
               {turn.role === 'assistant' ? block.persona_name : `@${block.username}`}
             </span>
-            <span className="ml-2 text-xs text-[var(--color-text-secondary)]">
+            <span className="ml-2 text-xs text-text-secondary">
               {new Date(turn.created_at).toLocaleString()}
             </span>
-            <p className="mt-0.5 whitespace-pre-wrap text-[var(--color-text-secondary)]">
-              {turn.content}
-            </p>
+            <p className="mt-0.5 whitespace-pre-wrap text-text-secondary">{turn.content}</p>
           </li>
         ))}
       </ol>
@@ -114,7 +112,7 @@ export default function OmniChatPersonaBlocksTab() {
         <h2 id="persona-blocks-heading" className="text-2xl font-bold">
           Character blocks
         </h2>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+        <p className="mt-1 text-sm text-text-secondary">
           People a character has stopped talking to, newest first. Lapsed and already-overturned
           blocks stay listed — a short block ends before anyone can look at it, and those are the
           ones most likely to have been unfair. Overturning lets the person back in immediately and
@@ -126,17 +124,17 @@ export default function OmniChatPersonaBlocksTab() {
 
       {blocksQuery.isLoading && <p>Loading blocks…</p>}
       {blocksQuery.isError && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">
+        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 p-4 text-red-800">
           Blocks could not be loaded.
         </p>
       )}
       {overturnMutation.isError && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-red-800">
+        <p role="alert" className="rounded-sm border border-red-300 bg-red-50 p-4 text-red-800">
           The block could not be overturned.
         </p>
       )}
       {!blocksQuery.isLoading && blocks.length === 0 && (
-        <p className="rounded border border-[var(--color-border)] p-5 text-[var(--color-text-secondary)]">
+        <p className="rounded-sm border border-border p-5 text-text-secondary">
           No character has blocked anyone.
         </p>
       )}
@@ -146,34 +144,32 @@ export default function OmniChatPersonaBlocksTab() {
           <article
             key={block.id}
             data-testid="admin-persona-block"
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4"
+            className="rounded-lg border border-border bg-(--color-surface-elevated) p-4"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-semibold">
                   {block.persona_name} blocked @{block.username}
                 </p>
-                <p className="text-sm text-[var(--color-text-secondary)]">
+                <p className="text-sm text-text-secondary">
                   {TIER_LABELS[block.tier] ?? `Tier ${block.tier}`}
                   {block.expires_at && ` · until ${new Date(block.expires_at).toLocaleString()}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <BlockState block={block} />
-                <time className="text-xs text-[var(--color-text-secondary)]">
+                <time className="text-xs text-text-secondary">
                   {new Date(block.created_at).toLocaleString()}
                 </time>
               </div>
             </div>
 
-            <p className="mt-3 rounded bg-[var(--color-surface)] p-3 text-sm">{block.reason}</p>
+            <p className="mt-3 rounded-sm bg-surface p-3 text-sm">{block.reason}</p>
 
             <BlockTranscript block={block} />
 
             {block.overturn_note && (
-              <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                Review note: {block.overturn_note}
-              </p>
+              <p className="mt-2 text-sm text-text-secondary">Review note: {block.overturn_note}</p>
             )}
 
             {!block.overturned_at &&
@@ -191,7 +187,7 @@ export default function OmniChatPersonaBlocksTab() {
                     onChange={(event) => setNote(event.target.value)}
                     rows={2}
                     maxLength={1000}
-                    className="w-full rounded border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-sm"
+                    className="w-full rounded-sm border border-border bg-surface p-2 text-sm"
                   />
                   <div className="flex gap-2">
                     <button
@@ -200,7 +196,7 @@ export default function OmniChatPersonaBlocksTab() {
                       onClick={() =>
                         overturnMutation.mutate({ id: block.id, reviewNote: note.trim() })
                       }
-                      className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                      className="rounded-sm bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                     >
                       Overturn
                     </button>
@@ -210,7 +206,7 @@ export default function OmniChatPersonaBlocksTab() {
                         setNoteFor(null);
                         setNote('');
                       }}
-                      className="rounded border border-[var(--color-border)] px-3 py-1.5 text-sm"
+                      className="rounded-sm border border-border px-3 py-1.5 text-sm"
                     >
                       Cancel
                     </button>
@@ -223,7 +219,7 @@ export default function OmniChatPersonaBlocksTab() {
                     setNoteFor(block.id);
                     setNote('');
                   }}
-                  className="mt-4 rounded border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold"
+                  className="mt-4 rounded-sm border border-border px-3 py-1.5 text-sm font-semibold"
                 >
                   Overturn…
                 </button>

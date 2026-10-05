@@ -360,7 +360,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder={translate(t, 'omnichat.omniai.search', 'Search')}
                   aria-label={translate(t, 'omnichat.omniai.searchInterests', 'Search interests')}
-                  className="h-11 w-full max-w-[320px] rounded-xl border border-white/10 bg-white/[0.035] px-3.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
+                  className="h-11 w-full max-w-[320px] rounded-xl border border-white/10 bg-white/[0.035] px-3.5 text-sm text-white outline-hidden placeholder:text-white/30 focus:border-[#5d8fff]"
                 />
                 <OptionGrid
                   label={translate(t, 'omnichat.omniai.field.interests', 'Interests')}
@@ -415,7 +415,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                     'omnichat.omniai.styleNotePlaceholder',
                     'Always in black. Never wears trainers.'
                   )}
-                  className="min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-base font-medium text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
+                  className="min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-base font-medium text-white outline-hidden placeholder:text-white/30 focus:border-[#5d8fff]"
                 />
                 <p className="text-right text-[11px] tabular-nums text-white/30">
                   {`${[...flow.answers.styleNote].length} / ${STYLE_NOTE_LIMIT}`}
@@ -436,7 +436,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                     aria-describedby={nameProblem ? nameProblemId : undefined}
                     aria-label={`${p.Poss} name`}
                     placeholder={`${p.Poss} name`}
-                    className="h-14 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.035] px-4 text-lg font-medium text-white outline-none placeholder:text-white/30 focus:border-[#5d8fff]"
+                    className="h-14 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/[0.035] px-4 text-lg font-medium text-white outline-hidden placeholder:text-white/30 focus:border-[#5d8fff]"
                   />
                   <button
                     type="button"
@@ -492,7 +492,7 @@ export default function CreationFlow({ options, onMade, onRefused }: CreationFlo
                   if (step === TOTAL_STEPS) make.mutate();
                   else goForward();
                 }}
-                className="omnichat-touch-target min-w-[168px] rounded-full bg-[#426fc4] px-6 text-[14.5px] font-semibold text-white transition hover:bg-[#527fd3] disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-white/30"
+                className="omnichat-touch-target min-w-[168px] rounded-full bg-[#426fc4] px-6 text-[14.5px] font-semibold text-white transition hover:bg-[#527fd3] disabled:cursor-not-allowed disabled:bg-white/6 disabled:text-white/30"
               >
                 {make.isPending ? (
                   <Loader2 className="mx-auto animate-spin" size={18} />

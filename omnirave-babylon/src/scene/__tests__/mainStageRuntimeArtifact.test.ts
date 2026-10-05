@@ -28,12 +28,12 @@ describe('production Main Stage GLB', { timeout: 30_000 }, () => {
   it('retains unit tangent space after Draco compression and decoding', () => {
     const projectRoot = process.cwd();
     const runtimeGlb = path.join(projectRoot, 'public/assets/venues/main-stage/main-stage.glb');
-    const cli = path.join(projectRoot, 'node_modules/@gltf-transform/cli/bin/cli.js');
+    const cli = path.join(projectRoot, 'scripts/transform-asset.mjs');
     const scratch = mkdtempSync(path.join(tmpdir(), 'omnirave-main-stage-runtime-'));
     const decodedGlb = path.join(scratch, 'decoded.glb');
 
     try {
-      execFileSync(process.execPath, [cli, 'copy', runtimeGlb, decodedGlb], {
+      execFileSync(process.execPath, [cli, 'decode', runtimeGlb, decodedGlb], {
         encoding: 'utf8',
         stdio: 'pipe',
       });

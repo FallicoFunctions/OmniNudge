@@ -544,7 +544,7 @@ export function HiddenItemsView({
 
   const renderContent = () => {
     if (filteredItems.length === 0) {
-      return <p className="text-sm text-[var(--color-text-secondary)]">{t(emptyStateKey)}</p>;
+      return <p className="text-sm text-text-secondary">{t(emptyStateKey)}</p>;
     }
 
     return (
@@ -574,12 +574,8 @@ export function HiddenItemsView({
     <>
       {showHeading && (
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
-            {t('hidden.headingTitle')}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            {t('hidden.headingDescription')}
-          </p>
+          <h1 className="text-3xl font-bold text-text-primary">{t('hidden.headingTitle')}</h1>
+          <p className="mt-2 text-sm text-text-secondary">{t('hidden.headingDescription')}</p>
         </div>
       )}
 
@@ -593,7 +589,7 @@ export function HiddenItemsView({
       />
 
       {isLoading && (
-        <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div className="rounded-md border border-border bg-surface p-4">
           <LoadingMessage className="mt-0 text-sm">{t('hidden.loading')}</LoadingMessage>
         </div>
       )}
@@ -611,16 +607,14 @@ export function HiddenItemsView({
       {saveConfirmTarget && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-lg">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">
+            <h3 className="text-lg font-semibold text-text-primary">
               {t('hidden.modal.saveTitle')}
             </h3>
-            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              {t('hidden.modal.saveDescription')}
-            </p>
+            <p className="mt-2 text-sm text-text-secondary">{t('hidden.modal.saveDescription')}</p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setSaveConfirmTarget(null)}
-                className="rounded border border-[var(--color-border)] px-3 py-1 text-sm hover:bg-[var(--color-surface-elevated)]"
+                className="rounded-sm border border-border px-3 py-1 text-sm hover:bg-(--color-surface-elevated)"
               >
                 {t('common.cancel')}
               </button>
@@ -633,7 +627,7 @@ export function HiddenItemsView({
                   })
                 }
                 disabled={resaveRedditPostMutation.isPending}
-                className="rounded bg-[var(--color-primary)] px-3 py-1 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                className="rounded-sm bg-primary px-3 py-1 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
               >
                 {resaveRedditPostMutation.isPending
                   ? t('posts.status.saving')

@@ -24,7 +24,7 @@ export function OnlineStatusIndicator({
         title={label}
         aria-label={label}
       />
-      {showText && <span className="text-xs text-[var(--color-text-secondary)]">{label}</span>}
+      {showText && <span className="text-xs text-text-secondary">{label}</span>}
     </div>
   );
 }

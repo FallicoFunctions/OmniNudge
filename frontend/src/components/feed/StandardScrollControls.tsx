@@ -39,7 +39,7 @@ export function StandardScrollControls({
       {/* Top control bar */}
       <div className="absolute top-4 left-4 right-16 z-20 flex items-center gap-4">
         {/* Progress indicator */}
-        <div className="flex-1 bg-gray-800/80 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-3">
+        <div className="flex-1 bg-gray-800/80 backdrop-blur-xs rounded-full px-4 py-2 flex items-center gap-3">
           <div className="text-cyan-400 text-sm font-medium">
             {currentIndex + 1} / {totalPosts}
             {hasMore && '+'}
@@ -63,7 +63,7 @@ export function StandardScrollControls({
             autoAdvance
               ? 'bg-cyan-500 text-black hover:bg-cyan-400'
               : 'bg-gray-800/80 text-white hover:bg-gray-700/80'
-          } backdrop-blur-sm`}
+          } backdrop-blur-xs`}
           title={
             autoAdvance
               ? t('standardScrollControls.titles.pauseAutoAdvance')
@@ -102,7 +102,7 @@ export function StandardScrollControls({
         {/* Settings toggle */}
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="px-4 py-2 rounded-lg bg-gray-800/80 text-white hover:bg-gray-700/80 backdrop-blur-sm transition-all"
+          className="px-4 py-2 rounded-lg bg-gray-800/80 text-white hover:bg-gray-700/80 backdrop-blur-xs transition-all"
           title={t('standardScrollControls.titles.settings')}
         >
           <svg
@@ -158,17 +158,17 @@ export function StandardScrollControls({
           <div className="mt-4 pt-4 border-t border-gray-700">
             <div className="text-gray-400 text-xs space-y-1">
               <p>
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">↑↓</kbd>{' '}
+                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded-sm text-cyan-400">↑↓</kbd>{' '}
                 {t('standardScrollControls.help.navigate')}
               </p>
               <p>
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">
+                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded-sm text-cyan-400">
                   {t('standardScrollControls.keys.space')}
                 </kbd>{' '}
                 {t('standardScrollControls.help.toggleAuto')}
               </p>
               <p>
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-cyan-400">
+                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded-sm text-cyan-400">
                   {t('standardScrollControls.keys.escape')}
                 </kbd>{' '}
                 {t('standardScrollControls.help.exit')}

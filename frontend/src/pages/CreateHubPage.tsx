@@ -99,11 +99,11 @@ export default function CreateHubPage() {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Section: Basic Information */}
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h2 className="text-xl font-semibold mb-2 text-[var(--color-text-primary)]">
+        <div className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-xl font-semibold mb-2 text-text-primary">
             {t('createHubPage.sections.basic.title')}
           </h2>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+          <p className="text-sm text-text-secondary mb-6">
             {t('createHubPage.sections.basic.description')}
           </p>
 
@@ -121,12 +121,12 @@ export default function CreateHubPage() {
                   type="text"
                   value={name}
                   onChange={(e) => validateName(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] focus:ring-2 focus:outline-none ${
+                  className={`w-full px-3 py-2 border rounded-lg bg-(--color-surface-elevated) text-text-primary focus:ring-2 focus:outline-hidden ${
                     nameError
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : name.length >= 3
                         ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
-                        : 'border-[var(--color-border)] focus:ring-[var(--color-primary)]'
+                        : 'border-border focus:ring-primary'
                   }`}
                   placeholder={t('createHubPage.fields.name.placeholder')}
                   required
@@ -166,7 +166,7 @@ export default function CreateHubPage() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-(--color-surface-elevated) text-text-primary placeholder-(--color-text-muted) focus:ring-2 focus:ring-primary focus:border-primary focus:outline-hidden"
                 placeholder={t('createHubPage.fields.title.placeholder')}
                 maxLength={500}
               />
@@ -189,18 +189,18 @@ export default function CreateHubPage() {
         </div>
 
         {/* Section: Privacy & Visibility */}
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h2 className="text-xl font-semibold mb-2 text-[var(--color-text-primary)]">
+        <div className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-xl font-semibold mb-2 text-text-primary">
             {t('createHubPage.sections.privacy.title')}
           </h2>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+          <p className="text-sm text-text-secondary mb-6">
             {t('createHubPage.sections.privacy.description')}
           </p>
 
           <div className="space-y-6">
             {/* Type */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+              <label className="block text-sm font-semibold text-text-primary mb-2">
                 {t('createHubPage.fields.type.label')} <span className="text-red-500 ml-1">*</span>
               </label>
               <div className="space-y-2">
@@ -242,13 +242,13 @@ export default function CreateHubPage() {
                   type="checkbox"
                   checked={isNsfw}
                   onChange={(e) => setIsNsfw(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                  className="mt-1 h-4 w-4 rounded-sm border-border text-primary focus:ring-primary"
                 />
                 <div>
-                  <span className="font-medium text-[var(--color-text-primary)]">
+                  <span className="font-medium text-text-primary">
                     {t('createHubPage.fields.nsfw.label')}
                   </span>
-                  <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                  <p className="text-sm text-text-secondary mt-1">
                     {t('createHubPage.fields.nsfw.description')}
                   </p>
                 </div>
@@ -258,17 +258,17 @@ export default function CreateHubPage() {
         </div>
 
         {/* Section: Content Rules */}
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-          <h2 className="text-xl font-semibold mb-2 text-[var(--color-text-primary)]">
+        <div className="rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-xl font-semibold mb-2 text-text-primary">
             {t('createHubPage.sections.content.title')}
           </h2>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+          <p className="text-sm text-text-secondary mb-6">
             {t('createHubPage.sections.content.description')}
           </p>
 
           {/* Content Options */}
           <div>
-            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
+            <label className="block text-sm font-semibold text-text-primary mb-2">
               {t('createHubPage.fields.allowedPostTypes.label')}{' '}
               <span className="text-red-500 ml-1">*</span>
             </label>

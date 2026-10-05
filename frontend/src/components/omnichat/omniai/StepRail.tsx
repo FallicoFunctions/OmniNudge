@@ -59,7 +59,7 @@ export default function StepRail({ step, pronouns, onJump, label }: StepRailProp
                   ? 'bg-[#5d8fff]/20 text-[#7da8ff]'
                   : current
                     ? 'bg-[#426fc4] text-white'
-                    : 'bg-white/[0.06] text-white/35'
+                    : 'bg-white/6 text-white/35'
               }`}
             >
               {done ? <Check size={13} strokeWidth={3} /> : number}
