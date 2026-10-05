@@ -57,14 +57,7 @@ jobs:
           done
 
           mkdir -p .lighthouseci
-          for run_number in 1 2 3; do
-            npx --no-install lighthouse http://127.0.0.1:4173/ \
-              --chrome-flags="--headless --no-sandbox" \
-              --only-categories=performance,accessibility,best-practices,seo \
-              --output=json \
-              --output-path=".lighthouseci/report-${run_number}.json" \
-              --quiet
-          done
+          node ./scripts/run-lighthouse.mjs http://127.0.0.1:4173/ .lighthouseci
           node ./scripts/assert-lighthouse-budget.mjs .lighthouseci/report-*.json
 
       - name: Upload Lighthouse results
