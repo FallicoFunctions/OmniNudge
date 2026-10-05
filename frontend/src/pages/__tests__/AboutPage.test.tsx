@@ -27,7 +27,7 @@ describe('AboutPage', () => {
     expect(document.body).toBeTruthy();
   });
 
-  it('places the AI designer ahead of the overview cards and shows the messaging encryption section', () => {
+  it('introduces OmniRave before the existing features and keeps background on the About page', () => {
     render(
       <MemoryRouter>
         <AboutPage />
@@ -35,20 +35,20 @@ describe('AboutPage', () => {
     );
 
     const body = document.body.textContent ?? '';
-    expect(body.indexOf('aboutPage.aiDesigner.title')).toBeGreaterThanOrEqual(0);
-    expect(body.indexOf('aboutPage.availableToday.title')).toBeGreaterThanOrEqual(0);
-    expect(body.indexOf('aboutPage.vision.title')).toBeGreaterThanOrEqual(0);
-    expect(body.indexOf('aboutPage.aiDesigner.title')).toBeLessThan(
+    expect(body.indexOf('aboutPage.omnirave.title')).toBeLessThan(
       body.indexOf('aboutPage.availableToday.title')
     );
-    expect(body.indexOf('aboutPage.aiDesigner.title')).toBeLessThan(
-      body.indexOf('aboutPage.vision.title')
+    expect(screen.getByRole('link', { name: 'aboutPage.omnirave.link' })).toHaveAttribute(
+      'href',
+      '/games/omnirave'
     );
-
-    expect(screen.getByText('aboutPage.messagingEncryption.title')).toBeInTheDocument();
+    expect(screen.getByText('aboutPage.features.messaging.description')).toBeInTheDocument();
+    expect(screen.getByText('aboutPage.roadmap.omnichat')).toBeInTheDocument();
+    expect(screen.getByText('aboutPage.vision.description')).toBeInTheDocument();
     expect(screen.getByText('aboutPage.messagingEncryption.paragraph1')).toBeInTheDocument();
-    expect(screen.queryByText('aboutPage.messagingEncryption.paragraph2')).not.toBeInTheDocument();
-    expect(screen.queryByText('aboutPage.messagingEncryption.paragraph3')).not.toBeInTheDocument();
-    expect(screen.queryByText('aboutPage.roadmap.messaging.title')).not.toBeInTheDocument();
+    expect(screen.getByText('aboutPage.customization.paragraph1')).toBeInTheDocument();
+    expect(
+      screen.queryByText('aboutPage.roadmap.social.items.friendsFollowers')
+    ).not.toBeInTheDocument();
   });
 });

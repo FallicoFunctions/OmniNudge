@@ -14,6 +14,7 @@ import AuthModal from '../pages/AuthModal';
 import BugReportModal from '../components/bugReports/BugReportModal';
 import { subscriptionService } from '../services/subscriptionService';
 import { LoadingMessage } from '../components/common/StatusMessage';
+import { Modal } from '../components/common/Modal';
 import { ViewModeToggle } from '../components/feed/ViewModeToggle';
 import { HamburgerMenu } from '../components/navigation/HamburgerMenu';
 import { AccountMenu } from '../components/navigation/AccountMenu';
@@ -77,6 +78,10 @@ export default function MainLayout() {
       localStorage.getItem(ABOUT_MODAL_STORAGE_KEY) !== 'true'
   );
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const dismissAboutModal = () => {
+    if (dontShowAgain) localStorage.setItem(ABOUT_MODAL_STORAGE_KEY, 'true');
+    setShowAboutModal(false);
+  };
   const [showBugReportModal, setShowBugReportModal] = useState(false);
   const [bugReportUrl, setBugReportUrl] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -565,44 +570,43 @@ export default function MainLayout() {
       )}
 
       {showAboutModal && !isOmniChatRoute && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="w-full max-w-4xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl">
-            <div className="h-[70vh] overflow-y-auto pr-2">
-              <Suspense
-                fallback={
-                  <div className="py-6">
-                    <LoadingMessage>{t('common.loading')}</LoadingMessage>
-                  </div>
-                }
-              >
-                <AboutContent />
-              </Suspense>
-            </div>
-            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={dontShowAgain}
-                  onChange={(event) => setDontShowAgain(event.target.checked)}
-                  className="h-4 w-4"
-                />
-                {t('mainLayout.dontShowThisAgain')}
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  if (dontShowAgain) {
-                    localStorage.setItem(ABOUT_MODAL_STORAGE_KEY, 'true');
-                  }
-                  setShowAboutModal(false);
-                }}
-                className="rounded-md bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
-              >
-                {t('common.continue')}
-              </button>
-            </div>
+        <Modal
+          isOpen
+          onClose={dismissAboutModal}
+          ariaLabelledBy="welcome-title"
+          layerClassName="z-[60]"
+          className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-xl sm:p-6"
+        >
+          <div className="min-h-0 overflow-y-auto pr-2">
+            <Suspense
+              fallback={
+                <div className="py-6">
+                  <LoadingMessage>{t('common.loading')}</LoadingMessage>
+                </div>
+              }
+            >
+              <AboutContent variant="welcome" onNavigate={dismissAboutModal} />
+            </Suspense>
           </div>
-        </div>
+          <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-[var(--color-border)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <input
+                type="checkbox"
+                checked={dontShowAgain}
+                onChange={(event) => setDontShowAgain(event.target.checked)}
+                className="h-4 w-4"
+              />
+              {t('mainLayout.dontShowThisAgain')}
+            </label>
+            <button
+              type="button"
+              onClick={dismissAboutModal}
+              className="rounded-md bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)]"
+            >
+              {t('common.continue')}
+            </button>
+          </div>
+        </Modal>
       )}
 
       <UpgradeModal
