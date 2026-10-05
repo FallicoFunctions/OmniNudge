@@ -93,7 +93,7 @@ export function AboutContent({ className = '', variant = 'page', onNavigate }: A
         <p
           className={`text-sm ${compact ? 'leading-5' : 'leading-6'} text-[var(--color-text-secondary)]`}
         >
-          {t('aboutPage.roadmap.omnichat')}
+          {t('aboutPage.roadmap.dungeonMaster')}
         </p>
       </section>
 

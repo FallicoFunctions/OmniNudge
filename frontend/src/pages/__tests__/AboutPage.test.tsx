@@ -43,7 +43,7 @@ describe('AboutPage', () => {
       '/games/omnirave'
     );
     expect(screen.getByText('aboutPage.features.messaging.description')).toBeInTheDocument();
-    expect(screen.getByText('aboutPage.roadmap.omnichat')).toBeInTheDocument();
+    expect(screen.getByText('aboutPage.roadmap.dungeonMaster')).toBeInTheDocument();
     expect(screen.getByText('aboutPage.vision.description')).toBeInTheDocument();
     expect(screen.getByText('aboutPage.messagingEncryption.paragraph1')).toBeInTheDocument();
     expect(screen.getByText('aboutPage.customization.paragraph1')).toBeInTheDocument();

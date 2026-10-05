@@ -3440,7 +3440,7 @@
     },
     "omnirave": {
       "title": "OmniRave",
-      "description": "Walk around a shared music venue, chat with other players, customize your avatar, and join the fireworks or drone queues.",
+      "description": "Walk around a shared music venue, chat with other players, and step into the control booth to direct the drone show or hourly fireworks.",
       "link": "Play OmniRave"
     },
     "availableToday": {
@@ -3454,7 +3454,7 @@
       },
       "messaging": {
         "title": "Messaging and friends",
-        "description": "Send encrypted private messages, share files, and add friends.",
+        "description": "Send encrypted private messages, share files, add friends, and make voice or video calls.",
         "link": "Open messages"
       },
       "hubDesigner": {
@@ -3464,7 +3464,7 @@
     },
     "roadmap": {
       "title": "What I’m working on",
-      "omnichat": "I’m building OmniChat for AI conversations and roleplay. It isn’t open to the public yet."
+      "dungeonMaster": "I’m working on a game where an AI dungeon master runs the adventure and responds to your choices."
     },
     "vision": {
       "title": "Why I made it",
@@ -3472,7 +3472,7 @@
     },
     "messagingEncryption": {
       "title": "Message privacy",
-      "paragraph1": "Private messages are encrypted in the browser before they are sent. The server stores the encrypted messages. OmniChat is a separate AI feature and doesn’t use the same privacy model."
+      "paragraph1": "Private messages are encrypted in the browser before they are sent. The server stores the encrypted messages."
     },
     "customization": {
       "title": "Reddit content",
