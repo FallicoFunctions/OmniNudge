@@ -8,4 +8,4 @@ safetensors==0.8.0
 # 4.x bundles the Haar cascades used to frame the identity reference on the
 # face. 5.x dropped them, and headless avoids GUI system libraries.
 opencv-python-headless==4.14.0.94
-pyflakes==4.0.1
+pyflakes==4.0.2
