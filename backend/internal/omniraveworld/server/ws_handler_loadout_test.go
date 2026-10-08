@@ -28,13 +28,19 @@ func TestWSHandler_LoadoutEventPublishesAvatarToOtherConnections(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = firstConn.Close() }()
 
+	// Dial completes at the HTTP upgrade, before the handler adds the player.
+	// Observe that join before connecting the observer; otherwise its first
+	// queued snapshot may legitimately predate guest-1 entering the world.
+	require.NoError(t, firstConn.SetReadDeadline(time.Now().Add(5*time.Second)))
+	var firstSnapshot map[string]any
+	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
+	require.Nil(t, playerLoadoutForID(t, firstSnapshot, "guest-1"))
+
 	secondConn, _, err := websocket.DefaultDialer.Dial(baseURL+"?token="+newGuestWorldSessionToken(t, authService, "guest-2", "Guest-2", nil), worldDialHeader("https://play.omninudge.com"))
 	require.NoError(t, err)
 	defer func() { _ = secondConn.Close() }()
 
-	var firstSnapshot map[string]any
-	require.NoError(t, firstConn.ReadJSON(&firstSnapshot))
-
+	require.NoError(t, secondConn.SetReadDeadline(time.Now().Add(5*time.Second)))
 	var secondJoinSnapshot map[string]any
 	require.NoError(t, secondConn.ReadJSON(&secondJoinSnapshot))
 	require.Nil(t, playerLoadoutForID(t, secondJoinSnapshot, "guest-1"))
