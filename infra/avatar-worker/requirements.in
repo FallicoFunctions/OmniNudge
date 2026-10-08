@@ -5,7 +5,7 @@
 livekit==1.1.20
 kokoro==0.9.4
 Pillow==12.3.0
-numpy==2.4.6
+numpy==2.5.3
 soundfile==0.14.0
 transformers==5.18.0
 torch==2.13.0+cpu
