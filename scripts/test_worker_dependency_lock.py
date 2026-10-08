@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 from pathlib import Path
+import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -42,6 +44,43 @@ class WorkerLockTests(unittest.TestCase):
         text, packages = self.fixture()
         with self.assertRaisesRegex(ValueError, "Unpinned dependency: misaki requires spacy"):
             verify_lock(text.replace("spacy==3.8.16\n", ""), packages.__getitem__)
+
+    def test_regenerated_lock_survives_dependabot_unsafe_footer_cleanup(self):
+        # Dependabot's PipCompileFileUpdater removes this entire suffix when
+        # the original lock has no unsafe footer. PR #151 lost setuptools.
+        unsafe_note = r"\s*# The following packages are considered to be unsafe.*\Z"
+        compiled = "packaging==26.3\ntorch==2.13.0+cpu\n\n# The following packages are considered to be unsafe in a requirements file:\nsetuptools==84.0.0\n"
+
+        def postprocess(original):
+            if not re.search(unsafe_note, original, re.S):
+                return re.sub(unsafe_note, "\n", compiled, flags=re.S)
+            return compiled
+
+        previous = "packaging==26.3\nsetuptools==84.0.0\ntorch==2.13.0+cpu\n"
+        self.assertNotIn("setuptools", read_pins(postprocess(previous)))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "scripts").mkdir()
+            worker = root / "infra/avatar-worker"
+            worker.mkdir(parents=True)
+            lock = worker / "requirements.txt"
+            lock.write_text(previous)
+            lock.with_suffix(".in").write_text("torch==2.13.0+cpu\n")
+            script = root / "scripts/lock-worker-dependencies.sh"
+            script.write_text(Path(__file__).with_name(script.name).read_text())
+            binary = root / "bin"
+            binary.mkdir()
+            # uv owns resolution; this control exercises the actual lock writer
+            # with its resolved output, without registry access or installations.
+            uv = binary / "uv"
+            uv.write_text("#!/bin/sh\nexit 0\n")
+            uv.chmod(0o755)
+            subprocess.run(["bash", str(script), "avatar"], check=True,
+                           env={**os.environ, "PATH": f"{binary}:{os.environ['PATH']}"})
+            regenerated = lock.read_text()
+            self.assertEqual(read_pins(regenerated), read_pins(previous))
+            self.assertEqual(read_pins(postprocess(regenerated))["setuptools"].specifier,
+                             read_pins(previous)["setuptools"].specifier)
 
     def test_compiled_lock_cannot_change_a_direct_input_or_hide_a_major(self):
         inputs = "--extra-index-url https://download.pytorch.org/whl/cpu\nkokoro==0.9.4\ntorch==2.13.0+cpu\n"

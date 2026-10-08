@@ -96,6 +96,9 @@ test('workers cannot silently resolve new dependencies in CI or container builds
     assert.ok(base, 'the GPU runtime must be an immutable image');
     assert.equal(base[1], torch, 'CPU CI and container Torch versions must match');
     const pins = readFileSync(resolve(__dirname, '../..', requirements), 'utf8').split('\n');
+    const unsafeFooter = pins.indexOf('# The following packages are considered to be unsafe in a requirements file:');
+    assert.ok(unsafeFooter > 0 && pins.findIndex(line => line.startsWith('setuptools==')) > unsafeFooter,
+      'Dependabot must retain the pip-compile unsafe footer and its required setuptools pin');
     assert.ok(pins.includes(`torch==${torch}+cpu`));
     assert.ok(pins.includes(`torchvision==${torchvision}+cpu`));
     assert.equal(readFileSync(resolve(__dirname, '../..', requirements.replace('requirements.txt', '.python-version')), 'utf8').trim(), '3.12');
