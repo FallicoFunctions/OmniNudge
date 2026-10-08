@@ -1,7 +1,5 @@
-# Complete Python 3.12 / Linux dependency lock. Install with --no-deps.
-# PyTorch public versions accept the matching CPU wheel in CI and CUDA wheel
-# supplied by the container. GPU runtime libraries stay owned by that image.
-# Regenerate with scripts/lock-worker-dependencies.sh; see docs/dependency-updates.md.
+# Generated from requirements.in for Python 3.12/Linux.
+# pip-compile compatibility: --strip-extras
 
 addict==2.4.0
 aiofiles==25.1.0
@@ -87,8 +85,8 @@ sympy==1.14.0
 termcolor==3.3.0
 thinc==8.3.13
 tokenizers==0.23.2
-torch==2.13.0
-torchvision==0.28.0
+torch==2.13.0+cpu
+torchvision==0.28.0+cpu
 tqdm==4.70.1
 transformers==5.18.0
 typer==0.27.2

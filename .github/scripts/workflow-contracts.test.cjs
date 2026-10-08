@@ -41,9 +41,9 @@ test('privileged merger checks out only main and never installs or runs PR code'
 test('every active dependency manifest has Dependabot coverage and a merge policy', () => {
   const root = resolve(__dirname, '../..');
   const active = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
-    .split('\0').filter(name => /(?:^|\/)(?:package(?:-lock)?\.json|go\.(?:mod|sum)|requirements\.txt)$/.test(name)
+    .split('\0').filter(name => /(?:^|\/)(?:package(?:-lock)?\.json|go\.(?:mod|sum)|requirements\.(?:in|txt))$/.test(name)
       && existsSync(resolve(root, name)));
-  const files = { npm: ['package.json', 'package-lock.json'], gomod: ['go.mod', 'go.sum'], pip: ['requirements.txt'] };
+  const files = { npm: ['package.json', 'package-lock.json'], gomod: ['go.mod', 'go.sum'], pip: ['requirements.in', 'requirements.txt'] };
   const configured = parse(readFileSync(resolve(root, '.github/dependabot.yml'), 'utf8')).updates
     .flatMap(update => (files[update['package-ecosystem']] || []).map(name =>
       `${update.directory.replace(/^\/|\/$/g, '')}/${name}`.replace(/^\//, '')));
@@ -85,18 +85,23 @@ test('workers cannot silently resolve new dependencies in CI or container builds
   const install = workers.steps.find(step => step.name === 'Install pinned worker requirements');
   assert.ok(install.run.includes('pip install --no-deps -r'));
   assert.ok(workers.steps.some(step => step.run?.includes('test_worker_dependency_lock.py')));
-  assert.ok(workers.steps.some(step => step.run?.includes('pip-audit" --strict --no-deps --disable-pip -r "${{ matrix.requirements }}"')));
+  assert.ok(workers.steps.some(step => step.run?.includes('pip-audit" --strict --no-deps --disable-pip -r "$RUNNER_TEMP/worker-audit.txt"')));
   assert.equal(workers.steps.find(step => step.uses?.startsWith('actions/setup-python@')).with['python-version'], '3.12');
   for (const { requirements, torch, torchvision } of workers.strategy.matrix.include) {
     const docker = readFileSync(resolve(__dirname, '../..', requirements.replace('requirements.txt', 'Dockerfile')), 'utf8');
-    assert.ok(docker.includes('python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check'));
+    assert.ok(docker.includes('python -m pip install --no-cache-dir --no-deps -r worker-requirements.txt && python -m pip check'));
+    assert.ok(docker.includes("sed -E '/^(torch|torchvision)==/d' requirements.txt"));
     assert.ok(docker.includes('python3 -m venv --without-pip --system-site-packages /opt/worker-venv'));
     const base = /^FROM pytorch\/pytorch:([\d.]+)-cuda([\d.]+)-cudnn9-runtime@sha256:[a-f0-9]{64}$/m.exec(docker);
     assert.ok(base, 'the GPU runtime must be an immutable image');
     assert.equal(base[1], torch, 'CPU CI and container Torch versions must match');
     const pins = readFileSync(resolve(__dirname, '../..', requirements), 'utf8').split('\n');
-    assert.ok(pins.includes(`torch==${torch}`));
-    assert.ok(pins.includes(`torchvision==${torchvision}`));
+    assert.ok(pins.includes(`torch==${torch}+cpu`));
+    assert.ok(pins.includes(`torchvision==${torchvision}+cpu`));
+    assert.equal(readFileSync(resolve(__dirname, '../..', requirements.replace('requirements.txt', '.python-version')), 'utf8').trim(), '3.12');
+    const inputs = readFileSync(resolve(__dirname, '../..', requirements.replace('.txt', '.in')), 'utf8');
+    assert.ok(inputs.includes(`torch==${torch}+cpu`));
+    assert.ok(inputs.includes(`torchvision==${torchvision}+cpu`));
   }
   const container = workers.steps.find(step => step.name === 'Build and exercise the pinned CUDA container on CPU');
   assert.ok(container.run.includes('docker build'));

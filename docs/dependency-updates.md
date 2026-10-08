@@ -46,14 +46,23 @@ format-only PRs.
 
 ## Python workers
 
-Each worker's `requirements.txt` is a complete, exact dependency lock. CI and
+Each worker's `requirements.in` declares its direct pins, and `requirements.txt`
+is the complete compiled lock. Dependabot recognizes the pair and invokes its
+pip-compile resolver; `.python-version` selects Python 3.12. This prevents an
+isolated pydantic-core or mpmath bump from violating its parent's constraint.
+CI checks that every direct input matches the lock, then checks the full installed
+graph. Direct major or registry changes still require review; transitive lock
+changes must satisfy the resolver and all required checks. CI and
 Docker install it with `--no-deps`, then run `pip check`. CI audits every lock
 using an isolated, pinned pip-audit tool. Worker smoke tests also
 traverse installed package metadata, including required extras, and reject
 missing pins or a version that differs from the lock. Thus a new Transformers
 release cannot silently enter an unrelated PR's avatar environment.
-Container installs use a virtual environment that inherits the image's immutable
-Torch/CUDA packages. When worker inputs change, CI also builds the actual image
+The lock resolves against official CPU wheels. Container installs retain exactly
+the same upstream Torch/torchvision releases from the immutable CUDA image,
+using a virtual environment; the guard rejects any upstream-version mismatch.
+The audit maps only those CPU build tags to the upstream release advisories.
+When worker inputs change, CI also builds the actual image
 and runs the smoke tests on CPU inside it; GPU hardware execution remains a
 deployment check.
 
@@ -72,19 +81,20 @@ agree. Ordinary Torch updates require a coordinated container change; security
 update PRs remain enabled. For deployment, select a CUDA 13.0-capable GPU host;
 see the [RunPod runtime requirements](../infra/runpod/README.md).
 
-Dependabot can update all pinned packages. After manually changing a pin that
-requires a different transitive graph, regenerate and validate the lock:
+Dependabot can update direct and transitive packages through the resolver. After
+manually changing a direct pin in `requirements.in`, regenerate and validate:
 
 ```sh
 scripts/lock-worker-dependencies.sh avatar  # or image / video; requires uv
-python -m pip install --no-deps -r infra/avatar-worker/requirements.txt
+python -m pip install --no-deps -r infra/avatar-worker/requirements.txt  # CPU Linux environment
 python -m pip check
 PYTHONPATH=. python scripts/worker-dependency-smoke.py avatar
 ```
 
 The regeneration script resolves for Python 3.12/Linux using CPU PyTorch metadata
-without installing into the caller's environment. Existing exact pins act as
-constraints: incompatible pins must be deliberately updated together.
+without installing into the caller's environment. It prefers existing lock
+versions while resolving the direct inputs. Both configured registries are
+explicitly trusted, matching pip-compile's cross-index selection.
 
 ## Fast guard checks
 

@@ -5,6 +5,10 @@ from pathlib import Path
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+from packaging.version import Version
+
+TORCH_PACKAGES = {"torch", "torchvision"}
+CPU_INDEX = "--extra-index-url https://download.pytorch.org/whl/cpu"
 
 
 # Supplied by the digest-pinned CUDA image, never resolved by worker pip installs.
@@ -19,11 +23,13 @@ GPU_RUNTIME_PACKAGES = {
 }
 
 
-def read_pins(text):
+def read_pins(text, *, inputs=False):
     pins = {}
     for line in text.splitlines():
         line = line.partition("#")[0].strip()
         if not line:
+            continue
+        if inputs and line == CPU_INDEX:
             continue
         requirement = Requirement(line)
         name = canonicalize_name(requirement.name)
@@ -38,6 +44,26 @@ def read_pins(text):
     return pins
 
 
+def runtime_pin(pin):
+    """CPU and CUDA builds share the exact locked upstream Torch release."""
+    version = Version(next(iter(pin.specifier)).version)
+    if canonicalize_name(pin.name) in TORCH_PACKAGES and version.local == "cpu":
+        return Requirement(f"{pin.name}=={version.public}")
+    return pin
+
+
+def verify_inputs(inputs, lock):
+    roots, pins = read_pins(inputs, inputs=True), read_pins(lock)
+    for name, root in roots.items():
+        if name not in pins or not root.specifier.contains(next(iter(pins[name].specifier)).version):
+            raise ValueError(f"Compiled lock differs from direct input: {root}")
+
+
+def audit_requirements(text):
+    # PyPI's advisory service indexes upstream releases, not +cpu build tags.
+    return "".join(f"{runtime_pin(pin)}\n" for pin in read_pins(text).values())
+
+
 def verify_lock(text, distribution=metadata.distribution):
     pins = read_pins(text)
     pending = [(name, frozenset(pin.extras)) for name, pin in pins.items()]
@@ -48,7 +74,7 @@ def verify_lock(text, distribution=metadata.distribution):
             continue
         visited.add((name, extras))
         installed = distribution(name)
-        if name in pins and not pins[name].specifier.contains(installed.version):
+        if name in pins and not runtime_pin(pins[name]).specifier.contains(installed.version):
             raise ValueError(f"{name}=={installed.version} differs from committed {pins[name]}")
         for entry in installed.requires or []:
             required = Requirement(entry)
@@ -74,4 +100,18 @@ def verify_lock(text, distribution=metadata.distribution):
 def verify_worker(kind):
     directory = "infra/avatar-worker" if kind == "avatar" else f"infra/runpod/{kind}-worker"
     path = Path(__file__).resolve().parents[1] / directory / "requirements.txt"
-    verify_lock(path.read_text())
+    text = path.read_text()
+    verify_inputs(path.with_suffix(".in").read_text(), text)
+    verify_lock(text)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Prepare a worker lock for upstream-release vulnerability auditing")
+    parser.add_argument("kind", choices=("image", "video", "avatar"))
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    directory = "infra/avatar-worker" if args.kind == "avatar" else f"infra/runpod/{args.kind}-worker"
+    lock = Path(__file__).resolve().parents[1] / directory / "requirements.txt"
+    args.output.write_text(audit_requirements(lock.read_text()))

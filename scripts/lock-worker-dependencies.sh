@@ -10,15 +10,18 @@ case "${1:-}" in
 esac
 lock_output="$(mktemp)"
 trap 'rm -f "$lock_output"' EXIT
-uv pip compile "$requirements" --python-version 3.12 \
+cp "$requirements" "$lock_output"
+# Match pip-compile's selection across the two explicit, trusted registries.
+# Existing lock versions remain preferred unless an input requires a change.
+uv pip compile "${requirements%.txt}.in" --python-version 3.12 \
   --python-platform x86_64-unknown-linux-gnu --torch-backend cpu \
+  --index-strategy unsafe-best-match \
   --no-header --no-annotate --output-file "$lock_output"
 python3 - "$requirements" "$lock_output" <<'PY'
 from pathlib import Path
-import re
 import sys
 destination, source = map(Path, sys.argv[1:])
-header = destination.read_text().split("\n\n", 1)[0]
-text = re.sub(r"(?m)^(torch|torchvision)==([^\n+]+)\+cpu$", r"\1==\2", source.read_text())
+header = "# Generated from requirements.in for Python 3.12/Linux.\n# pip-compile compatibility: --strip-extras"
+text = source.read_text()
 destination.write_text(header + "\n\n" + text)
 PY

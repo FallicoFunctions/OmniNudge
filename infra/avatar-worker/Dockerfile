@@ -11,7 +11,8 @@ RUN python3 -m pip uninstall --break-system-packages --yes spin && \
     python3 -m venv --without-pip --system-site-packages /opt/worker-venv
 ENV PATH="/opt/worker-venv/bin:${PATH}"
 COPY requirements.txt ./requirements.txt
-RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check
+RUN sed -E '/^(torch|torchvision)==/d' requirements.txt > worker-requirements.txt && \
+    python -m pip install --no-cache-dir --no-deps -r worker-requirements.txt && python -m pip check
 COPY . ./avatar_worker
 
 RUN useradd --create-home --uid 10001 worker && \

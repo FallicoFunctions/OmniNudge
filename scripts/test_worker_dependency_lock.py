@@ -6,8 +6,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import worker_dependency_lock as guard
 
-from worker_dependency_lock import read_pins, verify_lock
+from worker_dependency_lock import read_pins, verify_lock, verify_inputs, audit_requirements
 
 
 class WorkerLockTests(unittest.TestCase):
@@ -40,6 +42,37 @@ class WorkerLockTests(unittest.TestCase):
         text, packages = self.fixture()
         with self.assertRaisesRegex(ValueError, "Unpinned dependency: misaki requires spacy"):
             verify_lock(text.replace("spacy==3.8.16\n", ""), packages.__getitem__)
+
+    def test_compiled_lock_cannot_change_a_direct_input_or_hide_a_major(self):
+        inputs = "--extra-index-url https://download.pytorch.org/whl/cpu\nkokoro==0.9.4\ntorch==2.13.0+cpu\n"
+        verify_inputs(inputs, "kokoro==0.9.4\ntorch==2.13.0+cpu\n")
+        for lock in ("kokoro==1.0.0\ntorch==2.13.0+cpu\n", "torch==2.13.0+cpu\n"):
+            with self.assertRaisesRegex(ValueError, "differs from direct input"):
+                verify_inputs(inputs, lock)
+
+    def test_cpu_lock_matches_only_the_same_upstream_cuda_release_and_audits_it(self):
+        lock = "torch==2.13.0+cpu\ntorchvision==0.28.0+cpu\n"
+        packages = {"torch": SimpleNamespace(version="2.13.0+cu130", requires=[]),
+                    "torchvision": SimpleNamespace(version="0.28.0+cu130", requires=["torch==2.13.0"])}
+        verify_lock(lock, packages.__getitem__)
+        self.assertEqual(audit_requirements(lock), "torch==2.13.0\ntorchvision==0.28.0\n")
+        packages["torchvision"].requires = []
+        packages["torch"].version = "2.14.0+cu130"
+        with self.assertRaisesRegex(ValueError, "differs from committed"):
+            verify_lock(lock, packages.__getitem__)
+
+    def test_worker_entrypoint_rejects_a_lock_that_disagrees_with_its_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            worker = root / "infra/avatar-worker"
+            worker.mkdir(parents=True)
+            (worker / "requirements.in").write_text("kokoro==0.9.4\n")
+            (worker / "requirements.txt").write_text("kokoro==1.0.0\n")
+            with patch.object(guard, "__file__", str(root / "scripts/worker_dependency_lock.py")), \
+                    patch.object(guard, "verify_lock") as graph_check:
+                with self.assertRaisesRegex(ValueError, "differs from direct input"):
+                    guard.verify_worker("avatar")
+                graph_check.assert_not_called()
 
     def test_gpu_runtime_exception_is_limited_to_the_container_graph(self):
         text, packages = self.fixture()
