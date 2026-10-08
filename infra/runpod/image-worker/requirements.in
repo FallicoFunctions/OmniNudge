@@ -10,6 +10,6 @@ diffusers==0.40.0
 transformers==5.18.0
 safetensors==0.8.0
 opencv-python-headless==4.14.0.94
-pyflakes==4.0.1
+pyflakes==4.0.2
 torch==2.13.0+cpu
 torchvision==0.28.0+cpu
