@@ -77,6 +77,7 @@ function compatibleVersion(before, after) {
   if (!oldVersion || !newVersion || oldVersion[1] !== newVersion[1]) return false;
   const oldNumbers = oldVersion[2].split('.').map(Number);
   const newNumbers = newVersion[2].split('.').map(Number);
+  if (![...oldNumbers, ...newNumbers].every(Number.isSafeInteger)) return false;
   if (oldNumbers.length !== newNumbers.length) return false;
   if (oldNumbers[0] !== newNumbers[0]) return false;
   for (let i = 0; i < oldNumbers.length; i++) {
@@ -98,11 +99,13 @@ function compatiblePythonVersion(before, after) {
   const previous = parse(before), next = parse(after);
   if (!previous || !next) return false;
   const a = previous[1].split('.').map(Number), b = next[1].split('.').map(Number);
+  const oldPost = Number(previous[2] ?? -1), newPost = Number(next[2] ?? -1);
+  if (![...a, ...b, oldPost, newPost].every(Number.isSafeInteger)) return false;
   if (a[0] !== b[0]) return false;
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
     if ((a[i] || 0) !== (b[i] || 0)) return (b[i] || 0) > (a[i] || 0);
   }
-  return Number(next[2] ?? -1) >= Number(previous[2] ?? -1);
+  return newPost >= oldPost;
 }
 
 function compatibleManifest(filename, beforeText, afterText) {
@@ -181,12 +184,24 @@ function compatibleManifest(filename, beforeText, afterText) {
   return filename === 'backend/go.sum';
 }
 
+function normalizeChecks(checks) {
+  // gh returns a union of CheckRun and StatusContext records. Keep legacy
+  // contexts distinct so one cannot stand in for a required Actions check.
+  return checks.map(check => check.__typename === 'StatusContext' ? {
+    name: `status:${check.context}`,
+    status: ['PENDING', 'EXPECTED'].includes(check.state) ? 'IN_PROGRESS' : 'COMPLETED',
+    conclusion: typeof check.context === 'string' && check.context.length > 0
+      && ['SUCCESS', 'FAILURE', 'ERROR'].includes(check.state) ? check.state : null,
+  } : check);
+}
+
 function checksPassed(checks) {
-  return REQUIRED_CHECKS.every(name => checks.some(check => check.name === name
+  const normalized = normalizeChecks(checks);
+  return REQUIRED_CHECKS.every(name => normalized.some(check => check.name === name
     && check.status === 'COMPLETED' && check.conclusion === 'SUCCESS'))
-    && checks.every(check => check.status === 'COMPLETED'
+    && normalized.every(check => check.status === 'COMPLETED'
       && ['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion));
 }
 
 module.exports = { DEPENDENCY_FILES: FILES, MAINTENANCE_FILES, REQUIRED_CHECKS, maintenancePublisher, trustedPullRequest, trustedChanges,
-  trustedMaintenancePullRequest, trustedMaintenanceChanges, compatibleVersion, compatibleManifest, checksPassed };
+  trustedMaintenancePullRequest, trustedMaintenanceChanges, compatibleVersion, compatibleManifest, normalizeChecks, checksPassed };

@@ -2,7 +2,7 @@
 
 const { execFileSync } = require('node:child_process');
 const { trustedPullRequest, trustedChanges, trustedMaintenancePullRequest, trustedMaintenanceChanges,
-  compatibleManifest, checksPassed, REQUIRED_CHECKS, maintenancePublisher } = require('./dependabot-policy.cjs');
+  compatibleManifest, normalizeChecks, checksPassed, REQUIRED_CHECKS, maintenancePublisher } = require('./dependabot-policy.cjs');
 const { appendFileSync } = require('node:fs');
 
 function gh(args) {
@@ -48,15 +48,43 @@ function actionsBot(user) {
   return user?.login === 'github-actions[bot]' && user.id === ACTIONS_BOT_ID && user.type === 'Bot';
 }
 function refreshMarker(pr) { return `<!-- dependabot-automerge-refresh:${pr.head.sha} -->`; }
-function refreshComments(repository, pr) {
+function refreshComments(repository, pr, allowPreviousHead = false) {
   return pages(`repos/${repository}/issues/${pr.number}/comments?per_page=100`)
     .filter(comment => actionsBot(comment.user) && typeof comment.body === 'string'
-      && comment.body.trim() === refreshMarker(pr));
+      && (comment.body.trim() === refreshMarker(pr) || (allowPreviousHead
+        && /^<!-- dependabot-automerge-refresh:[a-f0-9]{40} -->$/.test(comment.body.trim()))));
+}
+function ownsRefreshClosure(repository, pr) {
+  // A queued Dependabot update can move the head after our close. Ownership
+  // belongs to the authenticated refresh attempt, not the current commit.
+  const comments = refreshComments(repository, pr, true);
+  if (comments.length === 0) return false;
+  const events = pages(`repos/${repository}/issues/${pr.number}/events?per_page=100`);
+  const closed = events.filter(event => event.event === 'closed').at(-1);
+  const reopened = events.filter(event => event.event === 'reopened').at(-1);
+  return closed && actionsBot(closed.actor)
+    && comments.some(comment => Date.parse(comment.created_at) <= Date.parse(closed.created_at)
+      && (!reopened || Date.parse(comment.created_at) >= Date.parse(reopened.created_at)));
 }
 function reopen(repository, pr) {
+  const fresh = api(`repos/${repository}/pulls/${pr.number}`);
+  if (fresh.merged_at || !['open', 'closed'].includes(fresh.state)
+    || !trustedPullRequest({ ...fresh, state: 'open' }, repository)) return false;
+  // A close request can fail before reaching GitHub while a person closes the
+  // PR. Recover only a closure owned by this authenticated refresh attempt.
+  if (fresh.state === 'closed' && !ownsRefreshClosure(repository, pr)) {
+    if (fresh.labels?.some(label => label.name === REFRESH_LABEL)) {
+      api(`repos/${repository}/issues/${pr.number}/labels/${REFRESH_LABEL}`, 'DELETE');
+    }
+    console.log(`#${pr.number}: leaving PR closed; latest closure is not an authenticated refresh`);
+    return false;
+  }
   // A failed reopen must fail the job, rather than report a successful refresh.
-  apiPatch(`repos/${repository}/pulls/${pr.number}`, 'open');
-  api(`repos/${repository}/issues/${pr.number}/labels/${REFRESH_LABEL}`, 'DELETE');
+  if (fresh.state === 'closed') apiPatch(`repos/${repository}/pulls/${pr.number}`, 'open');
+  if (fresh.labels?.some(label => label.name === REFRESH_LABEL)) {
+    api(`repos/${repository}/issues/${pr.number}/labels/${REFRESH_LABEL}`, 'DELETE');
+  }
+  return true;
 }
 function apiPatch(path, state) { return gh(['api', '--method', 'PATCH', path, '-f', `state=${state}`]); }
 function recoverInterruptedRefresh(repository) {
@@ -64,18 +92,12 @@ function recoverInterruptedRefresh(repository) {
     if (!issue.pull_request) continue;
     const pr = api(`repos/${repository}/pulls/${issue.number}`);
     if (pr.merged_at || !trustedPullRequest({ ...pr, state: 'open' }, repository)) continue;
-    const comments = refreshComments(repository, pr);
-    if (comments.length === 0) continue;
-    const events = pages(`repos/${repository}/issues/${pr.number}/events?per_page=100`);
-    const closed = events.filter(event => event.event === 'closed').at(-1);
     // Never reopen a PR intentionally closed by a person or another app.
-    if (!closed || !actionsBot(closed.actor)
-      || !comments.some(comment => Date.parse(comment.created_at) <= Date.parse(closed.created_at))) continue;
+    if (!ownsRefreshClosure(repository, pr)) continue;
     if (process.env.DEPENDABOT_DRY_RUN === '1') {
       console.log(`#${pr.number}: would recover interrupted branch refresh`); continue;
     }
-    reopen(repository, pr);
-    console.log(`#${pr.number}: recovered interrupted branch refresh`);
+    if (reopen(repository, pr)) console.log(`#${pr.number}: recovered interrupted branch refresh`);
   }
 }
 function requestRefresh(repository, pr) {
@@ -108,9 +130,8 @@ function requestRefresh(repository, pr) {
     apiPatch(`repos/${repository}/pulls/${pr.number}`, 'closed');
   } finally {
     // Also attempt recovery if the close response was lost after GitHub applied it.
-    reopen(repository, pr);
+    if (reopen(repository, pr)) console.log(`#${pr.number}: requested Dependabot branch refresh`);
   }
-  console.log(`#${pr.number}: requested Dependabot branch refresh`);
 }
 
 function run(repository) {
@@ -159,7 +180,7 @@ function run(repository) {
         }
         requestRefresh(repository, pr); continue;
       }
-      const rollup = gh(['pr', 'view', String(pr.number), '--repo', repository, '--json', 'statusCheckRollup']).statusCheckRollup;
+      const rollup = normalizeChecks(gh(['pr', 'view', String(pr.number), '--repo', repository, '--json', 'statusCheckRollup']).statusCheckRollup);
       const checks = maintenance ? maintenanceChecks(repository, pr.head.sha) : rollup;
       // Dispatched jobs can succeed while GitHub's PR workflows still require
       // approval. Both the actual commit checks and the PR checks must pass.

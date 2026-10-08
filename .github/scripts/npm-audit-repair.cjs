@@ -187,9 +187,15 @@ function publish(root, repository) {
       api(`repos/${repository}/git/refs`, '--method', 'POST', '-f', `ref=refs/heads/${branch}`, '-f', `sha=${base}`);
     }
   }
-  const additions = changed.filter(path => contents(repository, path, expectedHead) !== readFileSync(join(root, path), 'utf8'))
+  const locks = DIRECTORIES.map(directory => `${directory}/package-lock.json`);
+  const remote = new Map(locks.map(path => [path, contents(repository, path, expectedHead)]));
+  // A retry must reuse the exact audited snapshot, including the lock that did
+  // not change locally. Signed, allowed-path commits alone do not prove that.
+  if ((pr || expectedHead !== base) && locks.some(path => remote.get(path) !== readFileSync(join(root, path), 'utf8'))) {
+    throw new Error('Existing repair differs from its content fingerprint; refusing to reuse its head');
+  }
+  const additions = changed.filter(path => remote.get(path) !== readFileSync(join(root, path), 'utf8'))
     .map(path => ({ path, contents: Buffer.from(readFileSync(join(root, path), 'utf8')).toString('base64') }));
-  if (pr && additions.length) throw new Error('Published repair differs from its content fingerprint; refusing to change its head');
   if (additions.length) {
     const query = 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }';
     const input = { branch: { repositoryNameWithOwner: repository, branchName: branch }, expectedHeadOid: expectedHead,

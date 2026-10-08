@@ -113,6 +113,30 @@ class WorkerLockTests(unittest.TestCase):
                     guard.verify_worker("avatar")
                 graph_check.assert_not_called()
 
+    def test_worker_entrypoint_preserves_requested_root_extras(self):
+        packages = {
+            "feature": SimpleNamespace(version="1.0.0", requires=['addon>=2; extra == "render"']),
+            "addon": SimpleNamespace(version="2.0.0", requires=[]),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            worker = root / "infra/avatar-worker"
+            worker.mkdir(parents=True)
+            inputs, lock = worker / "requirements.in", worker / "requirements.txt"
+            inputs.write_text("feature==1.0.0\n")
+            lock.write_text("feature==1.0.0\n")
+            with patch.object(guard, "__file__", str(root / "scripts/worker_dependency_lock.py")), \
+                    patch.object(guard, "verify_lock", lambda text, **options: verify_lock(text, packages.__getitem__, **options)):
+                guard.verify_worker("avatar")
+                inputs.write_text("feature[render]==1.0.0\n")
+                with self.assertRaisesRegex(ValueError, "Unpinned dependency: feature requires addon"):
+                    guard.verify_worker("avatar")
+                lock.write_text("feature==1.0.0\naddon==2.0.0\n")
+                guard.verify_worker("avatar")
+                packages["feature"].requires = ['addon>=3; extra == "render"']
+                with self.assertRaisesRegex(ValueError, "feature requires addon>=3"):
+                    guard.verify_worker("avatar")
+
     def test_gpu_runtime_exception_is_limited_to_the_container_graph(self):
         text, packages = self.fixture()
         text = text.replace("torch==2.6.0", "torch==2.13.0")
