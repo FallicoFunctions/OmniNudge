@@ -1,0 +1,45 @@
+name: Dependency maintenance
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_run:
+    workflows: ['CI', 'Security Scan']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      verify_publication:
+        description: 'Verify signed PR creation, CI dispatch and automatic merge with a whitespace-only lockfile change'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: dependency-maintenance
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AUDIT_REPAIR_VERIFY: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_publication }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Prepare compatible lockfile repairs without running package scripts
+        run: node .github/scripts/npm-audit-repair.cjs prepare
+      - name: Submit repair and start required checks
+        run: node .github/scripts/npm-audit-repair.cjs publish
+        env:
+          GH_TOKEN: ${{ github.token }}

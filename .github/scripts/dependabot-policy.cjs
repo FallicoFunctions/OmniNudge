@@ -22,6 +22,23 @@ const FILES = new Set([
   'infra/avatar-worker/requirements.txt',
 ]);
 
+const MAINTENANCE_FILES = new Set(['frontend/package-lock.json', 'omnirave-babylon/package-lock.json']);
+
+function trustedMaintenancePullRequest(pr, repository) {
+  return pr.state === 'open' && !pr.draft && pr.user?.login === 'github-actions[bot]'
+    && pr.user?.id === 41898282 && pr.user?.type === 'Bot'
+    && pr.head?.repo?.full_name === repository && pr.base?.repo?.full_name === repository
+    && pr.base?.ref === 'main' && /^dependency-maintenance\/npm-(?:audit|verify)-[a-f0-9]{12}$/.test(pr.head?.ref || '');
+}
+
+function trustedMaintenanceChanges(pr, files, commits) {
+  return files.length > 0 && files.length === pr.changed_files
+    && files.every(file => MAINTENANCE_FILES.has(file.filename) && file.status === 'modified')
+    && commits.length > 0 && commits.length === pr.commits && commits.at(-1).sha === pr.head.sha
+    && commits.every(commit => commit.author?.login === 'github-actions[bot]'
+      && commit.author?.id === 41898282 && commit.commit?.verification?.verified === true);
+}
+
 function trustedPullRequest(pr, repository) {
   return pr.state === 'open' && !pr.draft && pr.user?.login === 'dependabot[bot]'
     && pr.user?.id === 49699333 && pr.user?.type === 'Bot'
@@ -54,10 +71,24 @@ function compatibleVersion(before, after) {
   return (newVersion[3] || '') >= (oldVersion[3] || '');
 }
 
-function compatibleMap(before, after) {
+function compatibleMap(before, after, compare = compatibleVersion) {
   return isDeepStrictEqual(Object.keys(before).sort(), Object.keys(after).sort())
     && Object.keys(before).every(name => before[name] === after[name]
-      || compatibleVersion(before[name], after[name]));
+      || compare(before[name], after[name]));
+}
+
+function compatiblePythonVersion(before, after) {
+  // PEP 440 post releases are stable releases too (e.g. python-dateutil).
+  // Continue to reject prereleases, local builds, wildcards and downgrades.
+  const parse = value => /^(\d+(?:\.\d+){1,3})(?:\.post(\d+))?$/.exec(value);
+  const previous = parse(before), next = parse(after);
+  if (!previous || !next) return false;
+  const a = previous[1].split('.').map(Number), b = next[1].split('.').map(Number);
+  if (a[0] !== b[0]) return false;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (b[i] || 0) > (a[i] || 0);
+  }
+  return Number(next[2] ?? -1) >= Number(previous[2] ?? -1);
 }
 
 function compatibleManifest(filename, beforeText, afterText) {
@@ -89,12 +120,13 @@ function compatibleManifest(filename, beforeText, afterText) {
       const result = {};
       for (const line of text.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))) {
         const match = /^([A-Za-z0-9_.-]+)==([^\s;]+)$/.exec(line);
-        if (!match || result[match[1]]) throw new Error('Only unique pinned requirements can auto-merge');
-        result[match[1]] = match[2];
+        const name = match?.[1].toLowerCase().replace(/[-_.]+/g, '-');
+        if (!match || Object.hasOwn(result, name)) throw new Error('Only unique pinned requirements can auto-merge');
+        result[name] = match[2];
       }
       return result;
     };
-    return compatibleMap(parse(beforeText), parse(afterText));
+    return compatibleMap(parse(beforeText), parse(afterText), compatiblePythonVersion);
   }
   if (filename === 'backend/go.mod') {
     const parse = text => {
@@ -133,4 +165,5 @@ function checksPassed(checks) {
       && ['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion));
 }
 
-module.exports = { DEPENDENCY_FILES: FILES, REQUIRED_CHECKS, trustedPullRequest, trustedChanges, compatibleVersion, compatibleManifest, checksPassed };
+module.exports = { DEPENDENCY_FILES: FILES, MAINTENANCE_FILES, REQUIRED_CHECKS, trustedPullRequest, trustedChanges,
+  trustedMaintenancePullRequest, trustedMaintenanceChanges, compatibleVersion, compatibleManifest, checksPassed };

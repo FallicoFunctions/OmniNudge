@@ -1,7 +1,9 @@
 'use strict';
 
 const { execFileSync } = require('node:child_process');
-const { trustedPullRequest, trustedChanges, compatibleManifest, checksPassed } = require('./dependabot-policy.cjs');
+const { trustedPullRequest, trustedChanges, trustedMaintenancePullRequest, trustedMaintenanceChanges,
+  compatibleManifest, checksPassed, REQUIRED_CHECKS } = require('./dependabot-policy.cjs');
+const { appendFileSync } = require('node:fs');
 
 function gh(args) {
   return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }));
@@ -91,12 +93,15 @@ function run(repository) {
   recoverInterruptedRefresh(repository);
   let failed = false;
   for (const candidate of pages(`repos/${repository}/pulls?state=open&base=main&per_page=100`)) {
-    if (!trustedPullRequest(candidate, repository)) continue;
+    const maintenance = trustedMaintenancePullRequest(candidate, repository);
+    const trustedPR = maintenance ? trustedMaintenancePullRequest : trustedPullRequest;
+    const trustedFiles = maintenance ? trustedMaintenanceChanges : trustedChanges;
+    if (!trustedPR(candidate, repository)) continue;
     try {
       const pr = api(`repos/${repository}/pulls/${candidate.number}`);
       const files = pages(`repos/${repository}/pulls/${pr.number}/files?per_page=100`);
       const commits = pages(`repos/${repository}/pulls/${pr.number}/commits?per_page=100`);
-      if (!trustedPullRequest(pr, repository) || !trustedChanges(pr, files, commits)) {
+      if (!trustedPR(pr, repository) || !trustedFiles(pr, files, commits)) {
         console.log(`#${pr.number}: requires review (identity or changed files)`); continue;
       }
       // The reopen may have succeeded even if its response was lost. Clear
@@ -117,13 +122,26 @@ function run(repository) {
       // GitHub refreshes the pull request's cached base SHA. Stale check failures
       // must not prevent refreshing the branch and validating it again.
       if (comparison.behind_by > 0) {
+        if (maintenance) {
+          console.log(`#${pr.number}: waiting for maintenance to rebuild against current main`); continue;
+        }
         requestRefresh(repository, pr); continue;
       }
       const { statusCheckRollup: checks } = gh(['pr', 'view', String(pr.number), '--repo', repository,
         '--json', 'statusCheckRollup']);
-      if (!checksPassed(checks)) { console.log(`#${pr.number}: waiting for all checks`); continue; }
+      if (!checksPassed(checks)) {
+        const blockers = checks.filter(check => check.status === 'COMPLETED'
+          && (!['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion)
+            || (REQUIRED_CHECKS.includes(check.name) && check.conclusion !== 'SUCCESS')));
+        const message = blockers.length
+          ? `#${pr.number}: blocked by ${blockers.map(check => `${check.name} (${check.conclusion})`).join(', ')}`
+          : `#${pr.number}: waiting for required checks`;
+        console.log(message);
+        if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n\n`);
+        continue;
+      }
       const fresh = api(`repos/${repository}/pulls/${pr.number}`);
-      if (!trustedPullRequest(fresh, repository) || fresh.head.sha !== pr.head.sha || api(`repos/${repository}/git/ref/heads/main`).object.sha !== mainSha) {
+      if (!trustedPR(fresh, repository) || fresh.head.sha !== pr.head.sha || api(`repos/${repository}/git/ref/heads/main`).object.sha !== mainSha) {
         console.log(`#${pr.number}: changed during validation; retry next run`); continue;
       }
       if (process.env.DEPENDABOT_DRY_RUN === '1') {

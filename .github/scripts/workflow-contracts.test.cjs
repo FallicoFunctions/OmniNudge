@@ -58,3 +58,32 @@ test('backend coverage uses the fail-closed aggregate checker', () => {
   assert.ok(steps.some(step => step.uses?.startsWith('actions/setup-node@')
     && step.with?.['node-version'] === '22'));
 });
+
+test('maintenance uses only main, has no token during resolution, and can dispatch every required workflow', () => {
+  const workflow = read('dependency-maintenance.yml');
+  const steps = workflow.jobs.repair.steps;
+  const checkout = steps.find(step => step.uses?.startsWith('actions/checkout@'));
+  assert.equal(checkout.with.ref, 'main');
+  assert.equal(checkout.with['persist-credentials'], false);
+  const commands = steps.filter(step => step.run);
+  assert.deepEqual(commands.map(step => step.run), ['node .github/scripts/npm-audit-repair.cjs prepare', 'node .github/scripts/npm-audit-repair.cjs publish']);
+  assert.equal(commands[0].env, undefined, 'registry commands must not receive the write token');
+  assert.deepEqual(commands[1].env, { GH_TOKEN: '${{ github.token }}' });
+  assert.equal(workflow.permissions.actions, 'write');
+  assert.ok(workflow.on.schedule.length);
+  assert.deepEqual(workflow.on.workflow_run.workflows, ['CI', 'Security Scan']);
+  for (const name of require('./npm-audit-repair.cjs').WORKFLOWS) {
+    assert.ok(Object.hasOwn(read(name).on, 'workflow_dispatch'), `${name} needs an explicit CI trigger for token-authored repairs`);
+  }
+});
+
+test('workers cannot silently resolve new dependencies in CI or container builds', () => {
+  const workers = read('ci.yml').jobs.workers;
+  const install = workers.steps.find(step => step.name === 'Install pinned worker requirements');
+  assert.ok(install.run.includes('pip install --no-deps -r'));
+  assert.ok(workers.steps.some(step => step.run?.includes('test_worker_dependency_lock.py')));
+  for (const { requirements } of workers.strategy.matrix.include) {
+    const docker = readFileSync(resolve(__dirname, '../..', requirements.replace('requirements.txt', 'Dockerfile')), 'utf8');
+    assert.ok(docker.includes('pip install --no-cache-dir --no-deps -r requirements.txt && pip check'));
+  }
+});

@@ -76,6 +76,17 @@ test('pip pins and Go modules cannot introduce majors or unrelated directives', 
   assert.equal(compatibleManifest('backend/go.mod', before, after + 'replace example => attacker\n'), false);
 });
 
+test('complete Python locks accept stable post releases while rejecting normalized duplicates and prereleases', () => {
+  const file = 'infra/avatar-worker/requirements.txt';
+  const eligible = after => compatibleManifest(file, 'python-dateutil==2.9.0.post0\n', after);
+  assert.equal(eligible('python_dateutil==2.9.0.post1\n'), true);
+  assert.equal(eligible('python-dateutil==2.9.1\n'), true);
+  assert.equal(eligible('python-dateutil==2.9.0\n'), false);
+  assert.equal(eligible('python-dateutil==2.10.0rc1\n'), false);
+  assert.equal(eligible('python-dateutil==3.0.0\n'), false);
+  assert.throws(() => eligible('python-dateutil==2.9.0.post0\npython_dateutil==2.9.0.post1\n'), /unique pinned/);
+});
+
 test('Go updates may evolve the indirect graph while direct dependencies and directives stay guarded', () => {
   const before = 'module app\n\ngo 1.26\n\nrequire (\n go.opentelemetry.io/otel v1.46.0\n)\n\nrequire (\n go.opentelemetry.io/otel/metric v1.46.0 // indirect\n)\n';
   const after = before.replaceAll('v1.46.0', 'v1.47.0')

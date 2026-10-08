@@ -117,9 +117,18 @@ updates:
     directory: /infra/runpod/image-worker
     schedule:
       interval: daily
+    allow:
+      - dependency-type: all
     # OpenCV 5 removes cv2.data.haarcascades, used for identity face crops.
     # Keep taking fixes on v4 until the detector has a replacement asset.
     ignore:
+      # These wheels must match the CUDA container; update the image and pins together.
+      - dependency-name: torch
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      - dependency-name: torchaudio
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      - dependency-name: torchvision
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
       - dependency-name: opencv-python-headless
         update-types: ['version-update:semver-major']
     groups:
@@ -137,6 +146,15 @@ updates:
     directory: /infra/runpod/video-worker
     schedule:
       interval: daily
+    allow:
+      - dependency-type: all
+    ignore:
+      - dependency-name: torch
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      - dependency-name: torchaudio
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      - dependency-name: torchvision
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
     groups:
       video-worker-dependencies:
         patterns: ['*']
@@ -152,8 +170,20 @@ updates:
     directory: /infra/avatar-worker
     schedule:
       interval: daily
+    allow:
+      - dependency-type: all
     # Match the Python 3.11 base image until that container is migrated.
     ignore:
+      - dependency-name: torch
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      - dependency-name: torchaudio
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      - dependency-name: torchvision
+        update-types: ['version-update:semver-major', 'version-update:semver-minor', 'version-update:semver-patch']
+      # 5.19.0 crashes on CPU PyTorch 2.6 while importing Kokoro/AlbertModel.
+      # Later fixed releases remain eligible and must pass the real import smoke test.
+      - dependency-name: transformers
+        versions: ['5.19.0']
       - dependency-name: numpy
         versions: ['>=2.5']
     groups:

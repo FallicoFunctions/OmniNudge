@@ -4,9 +4,11 @@ import argparse
 import importlib
 from pathlib import Path
 import unittest
+from worker_dependency_lock import verify_worker
 
 
 def smoke(kind: str) -> None:
+    verify_worker(kind)
     if kind in {"image", "video"}:
         # Import the real pipeline classes. pip's resolver cannot detect API
         # removals between transformers, diffusers and the container's torch.

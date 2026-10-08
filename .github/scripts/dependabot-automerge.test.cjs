@@ -15,8 +15,9 @@ function fixture(options = {}) {
   const originalExitCode = process.exitCode;
   const originalDryRun = process.env.DEPENDABOT_DRY_RUN;
   const observed = { calls: [], comments: [], events: [], merges: [], labels: [], messages: [] };
-  const pr = { number: 1, state: 'open', draft: false, user: bot, changed_files: 1, commits: 1,
-    head: { sha: 'abc', ref: 'dependabot/pip/image/update', repo: { full_name: repository } },
+  const author = options.maintenance ? actions : bot;
+  const pr = { number: 1, state: 'open', draft: false, user: author, changed_files: 1, commits: 1,
+    head: { sha: 'abc', ref: options.maintenance ? 'dependency-maintenance/npm-audit-012345abcdef' : 'dependabot/pip/image/update', repo: { full_name: repository } },
     base: { sha: 'base', ref: 'main', repo: { full_name: repository } } };
   Object.defineProperty(pr, 'labels', { enumerable: true, get: () => observed.labels.map(name => ({ name })) });
   const state = { behind: 0, main: 'base', time: Date.parse('2026-10-01T00:00:00Z'),
@@ -45,14 +46,15 @@ function fixture(options = {}) {
       state.mainReads++;
       result = { object: { sha: state.advanceMain && state.mainReads % 2 === 0 ? 'new-main' : state.main } };
     } else if (endpoint.includes('/contents/')) {
-      result = { type: 'file', encoding: 'base64', content: Buffer.from('boto3==1.43.100\n').toString('base64') };
+      const text = options.maintenance ? JSON.stringify({ lockfileVersion: 3, packages: { '': { dependencies: { example: '^1.0.0' } }, 'node_modules/example': { version: '1.0.1' } } }) : 'boto3==1.43.100\n';
+      result = { type: 'file', encoding: 'base64', content: Buffer.from(text).toString('base64') };
     } else if (endpoint.includes('/compare/')) {
       assert.equal(endpoint, `repos/${repository}/compare/${state.main}...${pr.head.sha}`);
       result = { merge_base_commit: { sha: 'base' }, behind_by: state.behind };
     } else if (endpoint.includes('/files?')) {
-      result = [[{ filename: 'infra/runpod/image-worker/requirements.txt', status: 'modified' }]];
+      result = [[{ filename: options.maintenance ? 'frontend/package-lock.json' : 'infra/runpod/image-worker/requirements.txt', status: 'modified' }]];
     } else if (endpoint.includes('/commits?')) {
-      result = [[{ sha: pr.head.sha, author: bot, commit: { verification: { verified: true } } }]];
+      result = [[{ sha: pr.head.sha, author, commit: { verification: { verified: true } } }]];
     } else if (endpoint.includes('/comments?')) {
       result = [observed.comments];
     } else if (endpoint.includes('/events?')) {
@@ -104,6 +106,19 @@ test('exact-head merge requires successful checks and unchanged actual main and 
     assert.equal(f.observed.merges.length, 1, 'main advancing during validation must retry');
     f.state.advanceMain = false; f.state.changedHead = true; f.state.prReads = 0; f.run();
     assert.equal(f.observed.merges.length, 1, 'a changed head must be revalidated');
+  });
+});
+
+test('signed audit repairs use the same merge gates and never request a Dependabot refresh', () => {
+  withFixture({ maintenance: true }, f => {
+    f.run();
+    assert.equal(f.observed.merges.length, 1);
+    f.state.failure = true; f.run();
+    assert.equal(f.observed.merges.length, 1);
+    f.state.failure = false; f.state.behind = 1; f.run();
+    assert.equal(f.observed.merges.length, 1);
+    assert.equal(f.observed.events.length, 0);
+    assert.equal(f.observed.comments.length, 0);
   });
 });
 

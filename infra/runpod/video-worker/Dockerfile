@@ -18,7 +18,7 @@ ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 WORKDIR /app
 COPY infra/runpod/video-worker/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --no-deps -r requirements.txt && pip check
 COPY infra/runpod/omnichat_worker ./omnichat_worker
 
 RUN useradd --create-home --uid 10001 worker && \
