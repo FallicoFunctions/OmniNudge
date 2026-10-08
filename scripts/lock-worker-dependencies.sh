@@ -22,6 +22,13 @@ from pathlib import Path
 import sys
 destination, source = map(Path, sys.argv[1:])
 header = "# Generated from requirements.in for Python 3.12/Linux.\n# pip-compile compatibility: --strip-extras"
-text = source.read_text()
-destination.write_text(header + "\n\n" + text)
+lines = source.read_text().splitlines()
+unsafe = [line for line in lines if line.partition("==")[0] in {"pip", "setuptools", "distribute"}]
+text = "\n".join(line for line in lines if line not in unsafe).rstrip()
+if unsafe:
+    # Dependabot removes a newly introduced pip-compile unsafe footer, including
+    # its pins. Preserve the native footer so setuptools stays in the lock.
+    text += "\n\n# The following packages are considered to be unsafe in a requirements file:\n"
+    text += "\n".join(unsafe)
+destination.write_text(header + "\n\n" + text + "\n")
 PY
