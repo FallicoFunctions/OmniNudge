@@ -45,12 +45,21 @@ class WorkerLockTests(unittest.TestCase):
         text, packages = self.fixture()
         text = text.replace("torch==2.6.0", "torch==2.13.0")
         packages["torch"].version = "2.13.0+cu130"
-        packages["torch"].requires = ["cuda-toolkit[cudart]==13.0.3", "cuda-bindings>=13.0.3,<14"]
+        packages["torch"].requires = ["cuda-toolkit[cudart]==13.0.3", "cuda-bindings>=13.0.3,<14", "nvidia-cudnn-cu13==9.20.0.48"]
         packages["cuda-toolkit"] = SimpleNamespace(version="13.0.3", requires=['nvidia-cuda-runtime==13.0.96.*; extra == "cudart"'])
         packages["nvidia-cuda-runtime"] = SimpleNamespace(version="13.0.96", requires=[])
         packages["cuda-bindings"] = SimpleNamespace(version="13.0.3", requires=["cuda-pathfinder~=1.1"])
         packages["cuda-pathfinder"] = SimpleNamespace(version="1.1.0", requires=[])
+        packages["nvidia-cudnn-cu13"] = SimpleNamespace(version="9.20.0.48", requires=["nvidia-cublas"])
+        packages["nvidia-cublas"] = SimpleNamespace(version="13.1.1.3", requires=[])
         verify_lock(text, packages.__getitem__)
+        packages["nvidia-cudnn-cu13"].requires = ["nvidia-cublas>=14"]
+        with self.assertRaisesRegex(ValueError, "installed nvidia-cublas"):
+            verify_lock(text, packages.__getitem__)
+        packages["nvidia-cudnn-cu13"].requires = ["unexpected-gpu-package"]
+        with self.assertRaisesRegex(ValueError, "Unpinned dependency"):
+            verify_lock(text, packages.__getitem__)
+        packages["nvidia-cudnn-cu13"].requires = ["nvidia-cublas"]
         packages["torch"].requires = ["cuda-toolkit"]
         with self.assertRaisesRegex(ValueError, "Unpinned dependency"):
             verify_lock(text, packages.__getitem__)

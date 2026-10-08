@@ -56,8 +56,13 @@ def verify_lock(text, distribution=metadata.distribution):
                                           for extra in {"", *extras}):
                 continue
             child = canonicalize_name(required.name)
-            base_runtime = name == "torch" or name in GPU_RUNTIME_PACKAGES
-            image_owned = base_runtime and child in GPU_RUNTIME_PACKAGES and bool(required.specifier)
+            # cuDNN declares cuBLAS without a version specifier. Both are
+            # fixed by the image digest; Torch's entry into this graph must
+            # still be constrained, and application packages get no exception.
+            image_owned = child in GPU_RUNTIME_PACKAGES and (
+                name in GPU_RUNTIME_PACKAGES
+                or (name == "torch" and bool(required.specifier))
+            )
             if child not in pins and not image_owned:
                 raise ValueError(f"Unpinned dependency: {name} requires {required}; add it to the worker lock")
             resolved = distribution(child)
