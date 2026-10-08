@@ -66,9 +66,12 @@ test('maintenance uses only main, has no token during resolution, and can dispat
   assert.equal(checkout.with.ref, 'main');
   assert.equal(checkout.with['persist-credentials'], false);
   const commands = steps.filter(step => step.run);
-  assert.deepEqual(commands.map(step => step.run), ['node .github/scripts/npm-audit-repair.cjs prepare', 'node .github/scripts/npm-audit-repair.cjs publish']);
+  assert.deepEqual(commands.map(step => step.run), [
+    'npm install --global npm@11.12.1 --ignore-scripts --no-audit --no-fund',
+    'node .github/scripts/npm-audit-repair.cjs prepare', 'node .github/scripts/npm-audit-repair.cjs publish']);
   assert.equal(commands[0].env, undefined, 'registry commands must not receive the write token');
-  assert.deepEqual(commands[1].env, { GH_TOKEN: '${{ github.token }}' });
+  assert.equal(commands[1].env, undefined, 'registry commands must not receive the write token');
+  assert.deepEqual(commands[2].env, { GH_TOKEN: '${{ github.token }}' });
   assert.equal(workflow.permissions.actions, 'write');
   assert.ok(workflow.on.schedule.length);
   assert.deepEqual(workflow.on.workflow_run.workflows, ['CI', 'Security Scan']);

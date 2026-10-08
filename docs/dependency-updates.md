@@ -12,6 +12,9 @@ remain review work. Failed checks remain merge blockers.
 `Dependency maintenance` runs hourly and after a failed CI or Security Scan. It
 checks out **main**, repairs both npm lockfiles with `npm audit fix
 --package-lock-only --ignore-scripts`, and requires both complete audits to pass.
+It audits first and runs the repair only for a graph with a reported vulnerability;
+clean lockfiles remain byte-for-byte unchanged. The npm writer is pinned to the
+validated version so platform metadata is preserved during real repairs.
 It rejects manifest/source edits and direct major changes. It never uses `--force`
 or executes package lifecycle scripts while holding a write token.
 

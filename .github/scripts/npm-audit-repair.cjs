@@ -27,13 +27,22 @@ function summary(text) {
   console.log(text);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${text}\n`);
 }
-function assertCleanAudit(result, directory) {
+function auditReport(result, directory) {
   let audit;
   try { audit = JSON.parse(result.stdout); } catch { throw new Error(`${directory}: npm did not return a valid audit report`); }
-  if (result.error || result.signal || result.status !== 0 || audit.error
-    || audit.metadata?.vulnerabilities?.total !== 0 || !audit.vulnerabilities
+  const total = audit.metadata?.vulnerabilities?.total;
+  if (result.error || result.signal || ![0, 1].includes(result.status) || audit.error
+    || !Number.isSafeInteger(total) || total < 0 || !audit.vulnerabilities
     || typeof audit.vulnerabilities !== 'object' || Array.isArray(audit.vulnerabilities)
-    || Object.keys(audit.vulnerabilities).length !== 0) {
+    || (Object.keys(audit.vulnerabilities).length === 0) !== (total === 0)
+    || (result.status === 0) !== (total === 0)) {
+    throw new Error(`${directory}: npm audit failed or returned an inconsistent report`);
+  }
+  return audit;
+}
+function assertCleanAudit(result, directory) {
+  const audit = auditReport(result, directory);
+  if (audit.metadata.vulnerabilities.total !== 0) {
     const names = Object.keys(audit.vulnerabilities || {});
     throw new Error(`${directory}: audit remains blocked${names.length ? ` by ${names.join(', ')}` : ''}; no compatible automatic repair was found`);
   }
@@ -63,10 +72,15 @@ function prepare(root, run = spawnSync, verifyPublication = process.env.AUDIT_RE
   }
   for (const directory of DIRECTORIES) {
     const options = { cwd: join(root, directory), encoding: 'utf8', timeout: 5 * 60 * 1000, maxBuffer: 32 * 1024 * 1024 };
+    const auditArgs = ['audit', '--all', '--package-lock-only', '--ignore-scripts', '--audit-level=low', '--json'];
+    const initial = auditReport(run('npm', auditArgs, options), directory);
+    // A clean graph must stay byte-for-byte unchanged. Even audit fix can
+    // rewrite platform metadata when npm versions differ from the lock writer.
+    if (initial.metadata.vulnerabilities.total === 0) continue;
     // Never execute dependency lifecycle scripts in the maintenance job.
     const fixed = run('npm', ['audit', 'fix', '--package-lock-only', '--ignore-scripts', '--no-fund', '--audit-level=low'], options);
     if (fixed.error || fixed.signal || ![0, 1].includes(fixed.status)) throw new Error(`${directory}: npm audit fix could not run`);
-    const audit = run('npm', ['audit', '--all', '--package-lock-only', '--ignore-scripts', '--audit-level=low', '--json'], options);
+    const audit = run('npm', auditArgs, options);
     assertCleanAudit(audit, directory);
   }
   // npm may normalize whitespace even when the dependency graph is identical.
