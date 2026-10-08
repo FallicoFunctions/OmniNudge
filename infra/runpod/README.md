@@ -133,9 +133,13 @@ the video pipeline (and vice versa). Persist model caches on a RunPod network
 volume when available; the first cold start otherwise downloads the configured
 model into the container cache.
 
-Both Dockerfiles use PyTorch 2.7.1 with CUDA 12.8. RunPod's 24 GB serverless
-tier can allocate a Blackwell MIG slice, which requires this newer runtime;
-configure the endpoint's allowed CUDA version to `12.8` to match the image.
+Both Dockerfiles pin PyTorch 2.13.0 with CUDA 13.0 and Python 3.12 by image digest.
+This runtime fixes the older Torch advisories and retains Blackwell support.
+Before deploying a new image, set the endpoint's allowed CUDA version to `13.0`
+and use a compatible host (NVIDIA driver 580 or newer under
+[CUDA minor compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html)).
+CI exercises the matching CPU stack; an actual GPU deployment still needs its
+normal generation smoke test.
 
 The image endpoint should allocate at least 50 GB of container disk for the
 configured SDXL checkpoint plus the identity adapter and its CLIP encoder.

@@ -1,6 +1,6 @@
-# Keep image and video workers on the same CUDA runtime so either media path
-# can run on the Blackwell GPUs available in RunPod's 24 GB serverless tier.
-FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+# Keep the patched image and video runtimes identical, including Blackwell
+# support. Deployment requires a CUDA 13.0-capable host.
+FROM pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime@sha256:db80a41f8428644cebcb3d75b0b62df334ab6c0e75785951eb25f48bfbd42407
 
 ARG OMNICHAT_WORKER_BUILD=unknown
 
@@ -17,8 +17,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 WORKDIR /app
+# Spin builds PyTorch but is unused at runtime; its Click ceiling conflicts
+# with the worker lock. Keep the image's Torch/CUDA packages available.
+RUN python3 -m pip uninstall --break-system-packages --yes spin && \
+    python3 -m venv --without-pip --system-site-packages /opt/worker-venv
+ENV PATH="/opt/worker-venv/bin:${PATH}"
 COPY infra/runpod/video-worker/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check
 COPY infra/runpod/omnichat_worker ./omnichat_worker
 
 RUN useradd --create-home --uid 10001 worker && \

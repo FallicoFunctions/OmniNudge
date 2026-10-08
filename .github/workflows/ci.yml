@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, master]
   pull_request:
@@ -70,38 +71,73 @@ jobs:
   workers:
     name: Worker dependencies (${{ matrix.kind }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
         include:
           - kind: image
             requirements: infra/runpod/image-worker/requirements.txt
-            torch: '2.7.1'
-            torchvision: '0.22.1'
+            context: .
+            torch: '2.13.0'
+            torchvision: '0.28.0'
           - kind: video
             requirements: infra/runpod/video-worker/requirements.txt
-            torch: '2.7.1'
-            torchvision: '0.22.1'
+            context: .
+            torch: '2.13.0'
+            torchvision: '0.28.0'
           - kind: avatar
             requirements: infra/avatar-worker/requirements.txt
-            torch: '2.6.0'
-            torchvision: '0.21.0'
+            context: infra/avatar-worker
+            torch: '2.13.0'
+            torchvision: '0.28.0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: pip
           cache-dependency-path: ${{ matrix.requirements }}
       - name: Install container-compatible CPU PyTorch
-        run: python -m pip install 'torch==${{ matrix.torch }}' 'torchvision==${{ matrix.torchvision }}' 'torchaudio==${{ matrix.torch }}' --index-url https://download.pytorch.org/whl/cpu
+        run: python -m pip install 'torch==${{ matrix.torch }}' 'torchvision==${{ matrix.torchvision }}' --index-url https://download.pytorch.org/whl/cpu
       - name: Install pinned worker requirements
-        run: python -m pip install -r '${{ matrix.requirements }}'
+        run: python -m pip install --no-deps -r '${{ matrix.requirements }}'
       - name: Verify installed dependencies
         run: python -m pip check
+      - name: Install isolated Python audit tool
+        run: |
+          python -m venv "$RUNNER_TEMP/pip-audit"
+          "$RUNNER_TEMP/pip-audit/bin/python" -m pip install pip-audit==2.10.1
+      - name: Audit complete worker lock
+        run: '"$RUNNER_TEMP/pip-audit/bin/pip-audit" --strict --no-deps --disable-pip -r "${{ matrix.requirements }}"'
+      - name: Exercise worker dependency lock controls
+        run: python -m unittest discover -s scripts -p 'test_worker_dependency_lock.py' -v
       - name: Import pipelines and run worker contracts without model downloads
         run: PYTHONPATH=. python scripts/worker-dependency-smoke.py '${{ matrix.kind }}'
+      - name: Detect container changes
+        id: container
+        env:
+          WORKER_REQUIREMENTS: ${{ matrix.requirements }}
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          if [ "$GITHUB_EVENT_NAME" = push ] || ! git diff --quiet origin/main HEAD -- \
+            "$(dirname "$WORKER_REQUIREMENTS")" infra/runpod/omnichat_worker \
+            scripts/worker-dependency-smoke.py scripts/worker_dependency_lock.py .github/workflows/ci.yml; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build and exercise the pinned CUDA container on CPU
+        if: steps.container.outputs.changed == 'true'
+        env:
+          WORKER_REQUIREMENTS: ${{ matrix.requirements }}
+          WORKER_CONTEXT: ${{ matrix.context }}
+          WORKER_KIND: ${{ matrix.kind }}
+        run: |
+          docker build --file "$(dirname "$WORKER_REQUIREMENTS")/Dockerfile" \
+            --tag "worker-validation:$WORKER_KIND" "$WORKER_CONTEXT"
+          docker run --rm --entrypoint python \
+            --volume "$GITHUB_WORKSPACE:/validation:ro" --workdir /validation \
+            --env PYTHONPATH=/validation "worker-validation:$WORKER_KIND" \
+            scripts/worker-dependency-smoke.py "$WORKER_KIND"
 
   backend:
     name: Backend (Go)

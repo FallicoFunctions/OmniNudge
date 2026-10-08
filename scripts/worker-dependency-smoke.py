@@ -4,16 +4,18 @@ import argparse
 import importlib
 from pathlib import Path
 import unittest
+from worker_dependency_lock import verify_worker
 
 
 def smoke(kind: str) -> None:
+    verify_worker(kind)
     if kind in {"image", "video"}:
         # Import the real pipeline classes. pip's resolver cannot detect API
         # removals between transformers, diffusers and the container's torch.
         import torch
         from diffusers import AutoPipelineForImage2Image, AutoPipelineForText2Image
 
-        assert torch.__version__.startswith("2.7.1"), torch.__version__
+        assert torch.__version__.startswith("2.13.0"), torch.__version__
         assert AutoPipelineForImage2Image and AutoPipelineForText2Image
         if kind == "image":
             import cv2

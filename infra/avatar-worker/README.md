@@ -15,6 +15,11 @@ Build from `infra/avatar-worker`:
 docker build -t omnichat-avatar-worker .
 ```
 
+The image pins patched PyTorch 2.13.0, CUDA 13.0, and Python 3.12 by digest.
+Select CUDA 13.0-capable RunPod hosts before deploying this image; see the
+[GPU runtime requirements](../runpod/README.md). CPU CI validates the matching
+Python lock and imports; deployment still needs a GPU call smoke test.
+
 Required runtime variables are `LIVEKIT_URL` and `LIVEKIT_TOKEN`. The API sets
 the first two for every call. The worker can use `OMNICHAT_AVATAR_IMAGE_URL`
 when the character image is stored on an approved HTTPS host. Application
