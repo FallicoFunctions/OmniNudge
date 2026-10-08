@@ -1,0 +1,16 @@
+# Direct worker dependencies. Dependabot recompiles requirements.txt from this input.
+# CPU wheels provide portable resolver metadata; Docker retains its matching CUDA wheels.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+runpod==1.12.0
+boto3==1.43.108
+Pillow==12.3.0
+accelerate==1.15.0
+diffusers==0.40.0
+transformers==5.18.0
+safetensors==0.8.0
+imageio==2.38.0
+imageio-ffmpeg==0.6.0
+ftfy==6.3.1
+torch==2.13.0+cpu
+torchvision==0.28.0+cpu

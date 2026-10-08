@@ -12,10 +12,12 @@ const { trustedMaintenancePullRequest, trustedMaintenanceChanges, compatibleMani
 const repository = 'FallicoFunctions/OmniNudge';
 const actions = { login: 'github-actions[bot]', id: 41898282, type: 'Bot' };
 const clean = () => ({ status: 0, stdout: JSON.stringify({ metadata: { vulnerabilities: { total: 0 } }, vulnerabilities: {} }) });
+const vulnerable = () => ({ status: 1, stdout: JSON.stringify({ metadata: { vulnerabilities: { total: 1 } }, vulnerabilities: { 'source-map-js': {} } }) });
 const lock = version => ({ name: 'test', lockfileVersion: 3, packages: {
   '': { name: 'test', dependencies: { postcss: '^8.5.6' } },
   'node_modules/postcss': { version: '8.5.6', dependencies: { 'source-map-js': '^1.2.1' } },
   'node_modules/source-map-js': { version },
+  'node_modules/@rollup/rollup-linux-x64-gnu': { version: '4.48.0', libc: ['glibc'], cpu: ['x64'], os: ['linux'], optional: true },
 } });
 function fixture(body) {
   const root = mkdtempSync(join(tmpdir(), 'audit-repair-test-'));
@@ -66,11 +68,30 @@ test('repair runs both full audits, never lifecycle scripts or forced upgrades, 
       assert.ok(args.includes('--ignore-scripts'));
       assert.ok(args.includes('--package-lock-only'));
       assert.ok(!args.includes('--force'));
-      if (args[1] === 'fix') writeFileSync(join(options.cwd, 'package-lock.json'), JSON.stringify(lock('1.2.2')));
+      const path = join(options.cwd, 'package-lock.json');
+      if (args[1] === 'fix') writeFileSync(path, JSON.stringify(lock('1.2.2')));
+      if (JSON.parse(readFileSync(path, 'utf8')).packages['node_modules/source-map-js'].version === '1.2.1') return vulnerable();
       return clean();
     });
     assert.deepEqual(changed.sort(), ['frontend/package-lock.json', 'omnirave-babylon/package-lock.json']);
-    assert.equal(calls.filter(call => call.args.includes('--all')).length, 2);
+    assert.equal(calls.filter(call => call.args.includes('--all')).length, 4);
+    assert.equal(calls.filter(call => call.args[1] === 'fix').length, 2);
+  });
+});
+
+test('clean audits never run audit fix or rewrite platform metadata', () => {
+  fixture(({ root, before }) => {
+    const calls = [];
+    assert.deepEqual(prepare(root, (_command, args) => {
+      calls.push(args);
+      assert.notEqual(args[1], 'fix', 'a clean graph must never be rewritten');
+      return clean();
+    }), []);
+    assert.equal(calls.length, 2);
+    for (const directory of ['frontend', 'omnirave-babylon']) {
+      const path = `${directory}/package-lock.json`;
+      assert.equal(readFileSync(join(root, path), 'utf8'), before[path]);
+    }
   });
 });
 

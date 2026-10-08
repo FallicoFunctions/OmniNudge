@@ -12,6 +12,7 @@ permissions:
   contents: write
   pull-requests: write
   checks: read
+  statuses: read
 
 concurrency:
   group: dependabot-automerge

@@ -67,9 +67,9 @@ test('lock-only direct major update cannot bypass the manifest policy', () => {
 });
 
 test('pip pins and Go modules cannot introduce majors or unrelated directives', () => {
-  assert.equal(compatibleManifest('infra/runpod/image-worker/requirements.txt', '# keep\nboto3==1.43.94\n', 'boto3==1.43.100\n'), true);
-  assert.equal(compatibleManifest('infra/runpod/image-worker/requirements.txt', 'opencv-python-headless==4.10.0.84\n', 'opencv-python-headless==5.0.0.93\n'), false);
-  assert.throws(() => compatibleManifest('infra/runpod/image-worker/requirements.txt', 'boto3==1.43.94\n', '-r attacker.txt\n'));
+  assert.equal(compatibleManifest('infra/runpod/image-worker/requirements.in', '# keep\nboto3==1.43.94\n', 'boto3==1.43.100\n'), true);
+  assert.equal(compatibleManifest('infra/runpod/image-worker/requirements.in', 'opencv-python-headless==4.10.0.84\n', 'opencv-python-headless==5.0.0.93\n'), false);
+  assert.throws(() => compatibleManifest('infra/runpod/image-worker/requirements.in', 'boto3==1.43.94\n', '-r attacker.txt\n'));
   const before = 'module app\n\ngo 1.26\n\nrequire (\n google.golang.org/grpc v1.83.2 // indirect\n)\n';
   const after = before.replace('v1.83.2', 'v1.84.0');
   assert.equal(compatibleManifest('backend/go.mod', before, after), true);
@@ -77,7 +77,7 @@ test('pip pins and Go modules cannot introduce majors or unrelated directives', 
 });
 
 test('complete Python locks accept stable post releases while rejecting normalized duplicates and prereleases', () => {
-  const file = 'infra/avatar-worker/requirements.txt';
+  const file = 'infra/avatar-worker/requirements.in';
   const eligible = after => compatibleManifest(file, 'python-dateutil==2.9.0.post0\n', after);
   assert.equal(eligible('python_dateutil==2.9.0.post1\n'), true);
   assert.equal(eligible('python-dateutil==2.9.1\n'), true);
@@ -85,6 +85,18 @@ test('complete Python locks accept stable post releases while rejecting normaliz
   assert.equal(eligible('python-dateutil==2.10.0rc1\n'), false);
   assert.equal(eligible('python-dateutil==3.0.0\n'), false);
   assert.throws(() => eligible('python-dateutil==2.9.0.post0\npython_dateutil==2.9.0.post1\n'), /unique pinned/);
+});
+
+test('compiled Python locks can change transitive graphs while direct inputs and registry settings stay protected', () => {
+  const directory = 'infra/avatar-worker/';
+  assert.equal(compatibleManifest(directory + 'requirements.txt', 'parent==1.0.0\nchild==1.0.0\n',
+    'parent==1.0.1\nchild==2.0.0\nnew-child==1.0.0\n'), true);
+  assert.equal(compatibleManifest(directory + 'requirements.in', 'parent==1.0.0\n', 'parent==2.0.0\n'), false);
+  const cpu = '--extra-index-url https://download.pytorch.org/whl/cpu\n';
+  assert.equal(compatibleManifest(directory + 'requirements.in', cpu + 'parent==1.0.0\n', cpu + 'parent==1.0.1\n'), true);
+  assert.equal(compatibleManifest(directory + 'requirements.in', cpu + 'parent==1.0.0\n', 'parent==1.0.1\n'), false);
+  assert.throws(() => compatibleManifest(directory + 'requirements.in', cpu + 'parent==1.0.0\n',
+    '--extra-index-url https://untrusted.invalid\nparent==1.0.1\n'));
 });
 
 test('Go updates may evolve the indirect graph while direct dependencies and directives stay guarded', () => {

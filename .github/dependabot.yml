@@ -113,6 +113,8 @@ updates:
   # The three workers pin the same imaging and model stack, so one CVE in
   # Pillow or transformers arrives three times. Grouped per worker, because a
   # worker is what gets rebuilt and redeployed as a unit.
+  # Each requirements.in / requirements.txt pair uses Dependabot's pip-compile
+  # resolver, so updates honor constraints between packages and their children.
   - package-ecosystem: pip
     directory: /infra/runpod/image-worker
     schedule:

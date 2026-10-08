@@ -20,6 +20,9 @@ const FILES = new Set([
   'infra/runpod/image-worker/requirements.txt',
   'infra/runpod/video-worker/requirements.txt',
   'infra/avatar-worker/requirements.txt',
+  'infra/runpod/image-worker/requirements.in',
+  'infra/runpod/video-worker/requirements.in',
+  'infra/avatar-worker/requirements.in',
 ]);
 
 const MAINTENANCE_FILES = new Set(['frontend/package-lock.json', 'omnirave-babylon/package-lock.json']);
@@ -115,18 +118,27 @@ function compatibleManifest(filename, beforeText, afterText) {
     // In particular, do not auto-merge lifecycle scripts or engine changes.
     return isDeepStrictEqual(before, after);
   }
-  if (filename.endsWith('/requirements.txt')) {
+  if (/\/requirements\.(?:in|txt)$/.test(filename)) {
     const parse = text => {
-      const result = {};
+      const pins = {}, directives = [];
       for (const line of text.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'))) {
+        if (line === '--extra-index-url https://download.pytorch.org/whl/cpu') {
+          directives.push(line); continue;
+        }
         const match = /^([A-Za-z0-9_.-]+)==([^\s;]+)$/.exec(line);
         const name = match?.[1].toLowerCase().replace(/[-_.]+/g, '-');
-        if (!match || Object.hasOwn(result, name)) throw new Error('Only unique pinned requirements can auto-merge');
-        result[name] = match[2];
+        if (!match || Object.hasOwn(pins, name)) throw new Error('Only unique pinned requirements can auto-merge');
+        pins[name] = match[2];
       }
-      return result;
+      return { pins, directives };
     };
-    return compatibleMap(parse(beforeText), parse(afterText), compatiblePythonVersion);
+    const before = parse(beforeText), after = parse(afterText);
+    if (!isDeepStrictEqual(before.directives, after.directives) || !Object.keys(after.pins).length) return false;
+    if (filename.endsWith('.in')) return compatibleMap(before.pins, after.pins, compatiblePythonVersion);
+    // requirements.in protects direct versions. The resolver may change the
+    // transitive lock graph; CI verifies every root against it and checks the
+    // complete installed dependency graph, audits and both runtime builds.
+    return after.directives.length === 0;
   }
   if (filename === 'backend/go.mod') {
     const parse = text => {

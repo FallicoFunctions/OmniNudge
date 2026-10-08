@@ -37,6 +37,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
+      - name: Use the validated lockfile writer
+        run: npm install --global npm@11.12.1 --ignore-scripts --no-audit --no-fund
       - name: Prepare compatible lockfile repairs without running package scripts
         run: node .github/scripts/npm-audit-repair.cjs prepare
       - name: Submit repair and start required checks
