@@ -16,6 +16,31 @@ function contents(repository, filename, sha) {
   return Buffer.from(file.content, 'base64').toString('utf8');
 }
 
+function maintenanceChecks(repository, sha) {
+  // GitHub may omit workflow_dispatch checks from a token-authored PR's
+  // GraphQL rollup. Read the actual check runs bound to the verified head.
+  const runs = gh(['api', '--paginate', '--slurp',
+    `repos/${repository}/commits/${sha}/check-runs?filter=latest&per_page=100`])
+    .flatMap(page => page.check_runs);
+  for (const run of runs) {
+    if (run.head_sha !== sha || (REQUIRED_CHECKS.includes(run.name)
+      && (run.app?.id !== 15368 || run.app?.slug !== 'github-actions'))) {
+      throw new Error('Required check has an unexpected commit or provider');
+    }
+  }
+  const checks = runs.map(run => ({ name: run.name, status: run.status.toUpperCase(),
+    conclusion: run.conclusion?.toUpperCase() || null }));
+  const contexts = new Set();
+  for (const status of pages(`repos/${repository}/commits/${sha}/statuses?per_page=100`)) {
+    if (contexts.has(status.context)) continue;
+    contexts.add(status.context);
+    checks.push({ name: `status:${status.context}`,
+      status: status.state === 'pending' ? 'IN_PROGRESS' : 'COMPLETED',
+      conclusion: status.state === 'success' ? 'SUCCESS' : 'FAILURE' });
+  }
+  return checks;
+}
+
 const ACTIONS_BOT_ID = 41898282;
 const REFRESH_LABEL = 'dependabot-refresh-in-progress';
 const REFRESH_WAIT_MS = 30 * 60 * 1000;
@@ -127,8 +152,8 @@ function run(repository) {
         }
         requestRefresh(repository, pr); continue;
       }
-      const { statusCheckRollup: checks } = gh(['pr', 'view', String(pr.number), '--repo', repository,
-        '--json', 'statusCheckRollup']);
+      const checks = maintenance ? maintenanceChecks(repository, pr.head.sha)
+        : gh(['pr', 'view', String(pr.number), '--repo', repository, '--json', 'statusCheckRollup']).statusCheckRollup;
       if (!checksPassed(checks)) {
         const blockers = checks.filter(check => check.status === 'COMPLETED'
           && (!['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion)

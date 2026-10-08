@@ -39,7 +39,15 @@ function fixture(options = {}) {
     const endpoint = args.find(arg => arg.startsWith('repos/'));
     const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
     let result;
-    if (endpoint.includes('/issues?')) {
+    if (endpoint.includes('/check-runs?')) {
+      assert.ok(endpoint.includes(`/commits/${pr.head.sha}/check-runs?`));
+      result = [{ check_runs: REQUIRED_CHECKS.map(name => ({ name,
+        head_sha: state.wrongCheckHead ? 'different-head' : pr.head.sha,
+        app: { id: state.wrongCheckApp ? 1 : 15368, slug: 'github-actions' },
+        status: 'completed', conclusion: state.failure ? 'failure' : 'success' })) }];
+    } else if (endpoint.includes('/statuses?')) {
+      result = [state.classicFailure ? [{ context: 'external', state: 'failure' }] : []];
+    } else if (endpoint.includes('/issues?')) {
       assert.ok(endpoint.includes(`state=closed&labels=${label}`));
       result = [pr.state === 'closed' && observed.labels.includes(label) ? [{ number: 1, pull_request: {} }] : []];
     } else if (endpoint.endsWith('/git/ref/heads/main')) {
@@ -119,6 +127,21 @@ test('signed audit repairs use the same merge gates and never request a Dependab
     assert.equal(f.observed.merges.length, 1);
     assert.equal(f.observed.events.length, 0);
     assert.equal(f.observed.comments.length, 0);
+  });
+});
+
+test('dispatched repair checks require the exact head and Actions provider and honor other failures', () => {
+  for (const option of ['wrongCheckHead', 'wrongCheckApp', 'classicFailure']) {
+    withFixture({ maintenance: true, [option]: true }, f => {
+      f.run();
+      assert.equal(f.observed.merges.length, 0, option);
+    });
+  }
+  withFixture({ maintenance: true }, f => {
+    f.run();
+    assert.equal(f.observed.merges.length, 1);
+    assert.ok(!f.observed.calls.some(args => args[0] === 'pr' && args[1] === 'view'),
+      'dispatched checks must not depend on the missing GraphQL PR rollup');
   });
 });
 

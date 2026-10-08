@@ -107,3 +107,14 @@ test('workers cannot silently resolve new dependencies in CI or container builds
   assert.ok(container.run.includes('docker build'));
   assert.ok(container.run.includes('scripts/worker-dependency-smoke.py "$WORKER_KIND"'));
 });
+
+test('dispatched security checks scan the full branch range without disabling secret detection', () => {
+  const steps = read('security.yml').jobs.gitleaks.steps;
+  assert.equal(steps.find(step => step.uses?.startsWith('gitleaks/')).if, "github.event_name != 'workflow_dispatch'");
+  const scan = steps.find(step => step.name === 'Scan dispatched branch changes with the same Gitleaks version');
+  assert.equal(scan.if, "github.event_name == 'workflow_dispatch'");
+  assert.ok(scan.run.includes('git merge-base origin/main HEAD'));
+  assert.ok(scan.run.includes('sha256sum --check'));
+  assert.ok(scan.run.includes('detect --redact --exit-code=2 --log-opts="$scan_base..HEAD"'));
+  assert.equal(scan['continue-on-error'], undefined);
+});

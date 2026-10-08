@@ -26,6 +26,12 @@ the repair. Publishing is resumable and avoids duplicate checks for an unchanged
 head. Obsolete repair PRs are retired only after authenticating their bot authors
 and lockfile-only changes.
 
+For these dispatched runs, the merger reads checks from the exact commit through
+GitHub's Checks API because the PR's GraphQL rollup can be empty. Required checks
+must come from GitHub Actions and pass on that head; other failing statuses also
+block merging. Dispatched secret scans use the same Gitleaks version and scan
+the full branch range from its merge base, matching a normal PR's scope.
+
 This covers registry audit findings that have not appeared in GitHub's Dependabot
 alerts. A zero alert count is not a substitute for successful npm audits. GitHub's
 [`allow` reference](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#allow)
