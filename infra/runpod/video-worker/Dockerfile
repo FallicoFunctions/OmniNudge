@@ -17,7 +17,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 WORKDIR /app
-RUN python3 -m venv --without-pip --system-site-packages /opt/worker-venv
+# Spin builds PyTorch but is unused at runtime; its Click ceiling conflicts
+# with the worker lock. Keep the image's Torch/CUDA packages available.
+RUN python3 -m pip uninstall --break-system-packages --yes spin && \
+    python3 -m venv --without-pip --system-site-packages /opt/worker-venv
 ENV PATH="/opt/worker-venv/bin:${PATH}"
 COPY infra/runpod/video-worker/requirements.txt ./requirements.txt
 RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check

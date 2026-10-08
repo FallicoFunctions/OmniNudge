@@ -14,7 +14,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OMNICHAT_WORKER_BUILD=${OMNICHAT_WORKER_BUILD}
 
 WORKDIR /app
-RUN python3 -m venv --without-pip --system-site-packages /opt/worker-venv
+# Spin builds PyTorch but is unused at runtime; its Click ceiling conflicts
+# with the worker lock. Keep the image's Torch/CUDA packages available.
+RUN python3 -m pip uninstall --break-system-packages --yes spin && \
+    python3 -m venv --without-pip --system-site-packages /opt/worker-venv
 ENV PATH="/opt/worker-venv/bin:${PATH}"
 COPY infra/runpod/image-worker/requirements.txt ./requirements.txt
 RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check
