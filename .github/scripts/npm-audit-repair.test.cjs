@@ -258,6 +258,66 @@ test('publisher signs with Actions and uses the App token only to create a PR wi
   });
 });
 
+test('publication recovery requires both lockfiles to match the audited snapshot', () => {
+  for (const published of [false, true]) for (const altered of [false, true]) {
+    fixture(({ root, before, base }) => {
+      const file = 'frontend/package-lock.json';
+      const desired = JSON.stringify(lock('1.2.2'));
+      writeFileSync(join(root, file), desired);
+      const branch = repairBranch(base, false, [[file, desired]]);
+      const files = [{ filename: file, status: 'modified' },
+        ...(altered ? [{ filename: 'omnirave-babylon/package-lock.json', status: 'modified' }] : [])];
+      const commits = [{ sha: 'signed-head', author: actions, commit: { verification: { verified: true } } }];
+      const pr = { number: 1, state: 'open', draft: false, user: publisher, changed_files: files.length, commits: 1,
+        head: { sha: 'signed-head', ref: branch, repo: { full_name: repository } },
+        base: { sha: base, ref: 'main', repo: { full_name: repository } } };
+      const values = { DEPENDENCY_PR_APP_SLUG: 'dependency-ci', DEPENDENCY_PR_APP_ACTUAL_SLUG: 'dependency-ci', PR_CREATION_TOKEN: 'fixture-app-token' };
+      const previous = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+      const original = childProcess.execFileSync;
+      const mutations = [];
+      Object.assign(process.env, values);
+      childProcess.execFileSync = (command, args, options) => {
+        if (command !== 'gh') return original(command, args, options);
+        const endpoint = args.find(arg => arg.startsWith('repos/') || arg.startsWith('users/'));
+        if (args.includes('--method') || args[1] === 'graphql') mutations.push(args);
+        if (endpoint?.startsWith('users/')) return JSON.stringify(publisher);
+        if (endpoint?.endsWith('/git/ref/heads/main')) return JSON.stringify({ object: { sha: base } });
+        if (endpoint?.includes('/pulls?state=open')) return JSON.stringify([published ? [pr] : []]);
+        if (endpoint?.includes('/pulls?state=closed')) return '[[]]';
+        if (endpoint?.includes('/git/matching-refs/')) return JSON.stringify([{ ref: `refs/heads/${branch}`, object: { sha: 'signed-head' } }]);
+        if (endpoint?.includes('/compare/')) return JSON.stringify({ behind_by: 0, total_commits: 1, files, commits });
+        if (endpoint?.includes('/files?')) return JSON.stringify([files]);
+        if (endpoint?.includes('/commits?')) return JSON.stringify([commits]);
+        if (endpoint?.endsWith('/pulls/1') || endpoint?.endsWith('/pulls')) return JSON.stringify(pr);
+        if (endpoint?.includes('/contents/')) {
+          const name = endpoint.split('/contents/')[1].split('?')[0];
+          const text = name === file ? desired : altered ? JSON.stringify(lock('1.2.3')) : before[name];
+          return JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from(text).toString('base64') });
+        }
+        throw new Error(`Unexpected API call ${endpoint}`);
+      };
+      try {
+        delete require.cache[require.resolve('./npm-audit-repair.cjs')];
+        const { publish } = require('./npm-audit-repair.cjs');
+        if (altered) {
+          assert.throws(() => publish(root, repository), /content fingerprint/,
+            'an extra changed lock must never be reused under the audited fingerprint');
+          assert.equal(mutations.length, 0);
+        } else {
+          publish(root, repository);
+          assert.equal(mutations.length, published ? 0 : 1, 'an exact interrupted commit creates only the missing PR');
+        }
+      } finally {
+        childProcess.execFileSync = original;
+        delete require.cache[require.resolve('./npm-audit-repair.cjs')];
+        for (const [key, value] of Object.entries(previous)) {
+          if (value === undefined) delete process.env[key]; else process.env[key] = value;
+        }
+      }
+    });
+  }
+});
+
 test('mutation control: removing the maintenance path guard is caught by a real denial assertion', () => {
   const directory = mkdtempSync(join(tmpdir(), 'maintenance-mutation-'));
   try {

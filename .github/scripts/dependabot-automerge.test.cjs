@@ -13,12 +13,14 @@ const label = 'dependabot-refresh-in-progress';
 function fixture(options = {}) {
   const original = childProcess.execFileSync;
   const originalClock = Date.now;
+  const originalLog = console.log;
   const originalExitCode = process.exitCode;
   const originalDryRun = process.env.DEPENDABOT_DRY_RUN;
   const originalPublisher = process.env.DEPENDENCY_PR_APP_SLUG;
   if (options.maintenance || options.publisherLookupFailure) process.env.DEPENDENCY_PR_APP_SLUG = 'dependency-ci';
   else delete process.env.DEPENDENCY_PR_APP_SLUG;
   const observed = { calls: [], comments: [], events: [], merges: [], labels: [], messages: [] };
+  console.log = message => observed.messages.push(message);
   const author = options.maintenance ? actions : bot;
   const pr = { number: 1, state: 'open', draft: false, user: options.maintenance ? publisher : bot, changed_files: 1, commits: 1,
     head: { sha: 'abc', ref: options.maintenance ? 'dependency-maintenance/npm-audit-012345abcdef' : 'dependabot/pip/image/update', repo: { full_name: repository } },
@@ -37,8 +39,10 @@ function fixture(options = {}) {
         observed.comments.push({ body: args.at(-1), user: actions, created_at: new Date(state.time).toISOString() });
         return '';
       }
-      return JSON.stringify({ statusCheckRollup: state.missingRollup ? [] : REQUIRED_CHECKS.map(name => ({ name,
-        status: 'COMPLETED', conclusion: state.failure ? 'FAILURE' : 'SUCCESS' })) });
+      return JSON.stringify({ statusCheckRollup: state.missingRollup ? [] : [
+        ...REQUIRED_CHECKS.map(name => ({ name, status: 'COMPLETED', conclusion: state.failure ? 'FAILURE' : 'SUCCESS' })),
+        ...(state.classicState ? [{ __typename: 'StatusContext', context: 'external-validation', state: state.classicState }] : []),
+      ] });
     }
     const endpoint = args.find(arg => arg.startsWith('repos/') || arg.startsWith('users/'));
     if (endpoint.startsWith('users/')) {
@@ -54,7 +58,8 @@ function fixture(options = {}) {
         app: { id: state.wrongCheckApp ? 1 : 15368, slug: 'github-actions' },
         status: 'completed', conclusion: state.failure ? 'failure' : 'success' })) }];
     } else if (endpoint.includes('/statuses?')) {
-      result = [state.classicFailure ? [{ context: 'external', state: 'failure' }] : []];
+      result = [state.classicFailure ? [{ context: 'external', state: 'failure' }]
+        : state.classicState ? [{ context: 'external-validation', state: state.classicState.toLowerCase() }] : []];
     } else if (endpoint.includes('/issues?')) {
       assert.ok(endpoint.includes(`state=closed&labels=${label}`));
       result = [pr.state === 'closed' && observed.labels.includes(label) ? [{ number: 1, pull_request: {} }] : []];
@@ -84,6 +89,12 @@ function fixture(options = {}) {
       result = [pr.state === 'open' ? [pr] : []];
     } else if (method === 'PATCH') {
       const next = args.find(arg => arg.startsWith('state=')).split('=')[1];
+      if (next === 'closed' && state.humanClosesBeforeClose) {
+        pr.state = 'closed';
+        observed.events.push({ event: 'closed', actor: { login: 'owner', id: 123, type: 'User' },
+          created_at: new Date(state.time).toISOString() });
+        throw new Error('close request failed after a human closure');
+      }
       if (next === 'open' && state.failReopen) throw new Error('reopen unavailable');
       pr.state = next;
       observed.events.push({ event: next === 'open' ? 'reopened' : 'closed', actor: actions, created_at: new Date(state.time).toISOString() });
@@ -101,6 +112,7 @@ function fixture(options = {}) {
   return { pr, state, observed, run: () => run(repository), close: () => {
     childProcess.execFileSync = original;
     Date.now = originalClock;
+    console.log = originalLog;
     process.exitCode = originalExitCode;
     if (originalDryRun === undefined) delete process.env.DEPENDABOT_DRY_RUN;
     else process.env.DEPENDABOT_DRY_RUN = originalDryRun;
@@ -163,6 +175,22 @@ test('repair checks require the actual PR rollup, exact head, Actions provider a
   });
 });
 
+test('legacy status contexts merge only on success and report terminal failures', () => {
+  for (const maintenance of [false, true]) {
+    for (const classicState of ['SUCCESS', 'PENDING', 'ERROR', 'FAILURE']) {
+      withFixture({ maintenance, classicState }, f => {
+        f.run();
+        assert.equal(f.observed.merges.length, classicState === 'SUCCESS' ? 1 : 0,
+          `${maintenance ? 'maintenance' : 'native'} ${classicState}`);
+        if (['ERROR', 'FAILURE'].includes(classicState)) {
+          assert.ok(f.observed.messages.some(message => message.includes('blocked by status:external-validation')),
+            'terminal legacy status failures must not be reported as merely pending');
+        }
+      });
+    }
+  }
+});
+
 test('stale branches use native close/reopen events, not rejected Dependabot commands', () => {
   withFixture({ behind: 1, failure: true, main: 'advanced' }, f => {
     f.run();
@@ -198,6 +226,20 @@ test('a lost close response still reopens the PR and reports failure', () => {
   });
 });
 
+test('ambiguous close failures preserve a concurrent human closure', () => {
+  withFixture({ behind: 1, humanClosesBeforeClose: true }, f => {
+    f.run();
+    assert.equal(f.pr.state, 'closed', 'a failed automation request must not undo a human closure');
+    assert.deepEqual(f.observed.events.map(event => event.event), ['closed']);
+    assert.deepEqual(f.observed.labels, [], 'human closures must not retain automated recovery bookkeeping');
+    assert.equal(process.exitCode, 1, 'the original transport error must remain visible');
+    assert.ok(f.observed.messages.some(message => message.includes('leaving PR closed')));
+    f.state.humanClosesBeforeClose = false;
+    f.run();
+    assert.equal(f.pr.state, 'closed', 'a later run must also preserve that decision');
+  });
+});
+
 test('interrupted refreshes recover next run; intentional human closures remain closed', () => {
   withFixture({ behind: 1, failReopen: true }, f => {
     f.run();
@@ -214,6 +256,30 @@ test('interrupted refreshes recover next run; intentional human closures remain 
     f.run();
     assert.equal(f.pr.state, 'closed', 'a human closure must never be undone');
   });
+});
+
+test('interrupted refresh recovery survives a concurrent head update but not a later closure cycle', () => {
+  for (const laterCycle of [false, true]) {
+    withFixture({ behind: 1, failReopen: true }, f => {
+      f.pr.head.sha = 'a'.repeat(40);
+      f.run();
+      assert.equal(f.pr.state, 'closed');
+      f.state.failReopen = false;
+      f.pr.head.sha = 'b'.repeat(40);
+      if (laterCycle) {
+        f.state.time += 1000;
+        f.observed.events.push({ event: 'reopened', actor: { login: 'owner', id: 123, type: 'User' },
+          created_at: new Date(f.state.time).toISOString() });
+        f.state.time += 1000;
+        f.observed.events.push({ event: 'closed', actor: actions,
+          created_at: new Date(f.state.time).toISOString() });
+      }
+      f.run();
+      assert.equal(f.pr.state, laterCycle ? 'closed' : 'open',
+        'recover only the authenticated closure cycle, even when its head changed');
+      if (!laterCycle) assert.deepEqual(f.observed.labels, []);
+    });
+  }
 });
 
 test('unauthenticated markers and closed recovery dry runs never cause writes', () => {

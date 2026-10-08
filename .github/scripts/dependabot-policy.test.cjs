@@ -58,6 +58,21 @@ test('allow patches/minors and Go pseudo versions; deny majors, downgrades and a
   }
 });
 
+test('unsafe numeric version components cannot disguise majors or downgrades', () => {
+  assert.equal(compatibleVersion('1.0.9007199254740990', '1.0.9007199254740991'), true);
+  for (const [before, after] of [
+    ['9007199254740992.0.0', '9007199254740993.0.0'],
+    ['1.9007199254740993.0', '1.9007199254740992.0'],
+    ['1.0.9007199254740991', '1.0.9007199254740992'],
+  ]) {
+    assert.equal(compatibleVersion(before, after), false);
+    assert.equal(compatibleManifest('infra/avatar-worker/requirements.in',
+      `package==${before}\n`, `package==${after}\n`), false);
+  }
+  assert.equal(compatibleManifest('infra/avatar-worker/requirements.in',
+    'package==1.0.post9007199254740993\n', 'package==1.0.post9007199254740992\n'), false);
+});
+
 test('npm policy permits fixes but rejects script/config changes and majors', () => {
   const before = { scripts: { build: 'vite build' }, dependencies: { dompurify: '^3.4.15' } };
   const after = { ...before, dependencies: { dompurify: '^3.4.16' } };
@@ -140,4 +155,18 @@ test('every required job must succeed; extra failures/pending checks also block 
   }
   assert.equal(checksPassed([{ ...checks[0], status: 'IN_PROGRESS' }, ...checks.slice(1)]), false);
   assert.equal(checksPassed([...checks, { ...check('Locale Guardrails'), conclusion: 'FAILURE' }]), false);
+});
+
+test('legacy status contexts accept success but cannot replace a required Actions check', () => {
+  const checks = REQUIRED_CHECKS.map(check);
+  const status = { __typename: 'StatusContext', context: 'external-validation', state: 'SUCCESS' };
+  assert.equal(checksPassed([...checks, status]), true);
+  for (const state of ['EXPECTED', 'PENDING', 'ERROR', 'FAILURE', 'unknown', undefined]) {
+    assert.equal(checksPassed([...checks, { ...status, state }]), false, String(state));
+  }
+  for (const context of ['', null, undefined, 123]) {
+    assert.equal(checksPassed([...checks, { ...status, context }]), false, String(context));
+  }
+  assert.equal(checksPassed([...checks.slice(1), { ...status, context: checks[0].name }]), false,
+    'a legacy status with the same name must not satisfy a required check run');
 });

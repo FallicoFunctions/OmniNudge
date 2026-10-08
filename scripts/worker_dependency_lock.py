@@ -53,10 +53,12 @@ def runtime_pin(pin):
 
 
 def verify_inputs(inputs, lock):
+    """Validate direct pins and retain their requested extras for graph checks."""
     roots, pins = read_pins(inputs, inputs=True), read_pins(lock)
     for name, root in roots.items():
         if name not in pins or not root.specifier.contains(next(iter(pins[name].specifier)).version):
             raise ValueError(f"Compiled lock differs from direct input: {root}")
+    return roots
 
 
 def audit_requirements(text):
@@ -64,9 +66,13 @@ def audit_requirements(text):
     return "".join(f"{runtime_pin(pin)}\n" for pin in read_pins(text).values())
 
 
-def verify_lock(text, distribution=metadata.distribution):
+def verify_lock(text, distribution=metadata.distribution, *, root_extras=None):
     pins = read_pins(text)
-    pending = [(name, frozenset(pin.extras)) for name, pin in pins.items()]
+    # pip-compile strips extras from the output lock. Preserve direct requests
+    # from requirements.in as well as extras discovered through dependency edges.
+    root_extras = root_extras or {}
+    pending = [(name, frozenset(pin.extras) | frozenset(root_extras.get(name, ())))
+               for name, pin in pins.items()]
     visited = set()
     while pending:
         name, extras = pending.pop()
@@ -101,8 +107,8 @@ def verify_worker(kind):
     directory = "infra/avatar-worker" if kind == "avatar" else f"infra/runpod/{kind}-worker"
     path = Path(__file__).resolve().parents[1] / directory / "requirements.txt"
     text = path.read_text()
-    verify_inputs(path.with_suffix(".in").read_text(), text)
-    verify_lock(text)
+    roots = verify_inputs(path.with_suffix(".in").read_text(), text)
+    verify_lock(text, root_extras={name: pin.extras for name, pin in roots.items()})
 
 
 if __name__ == "__main__":
