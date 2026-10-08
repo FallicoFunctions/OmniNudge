@@ -49,6 +49,10 @@ using an isolated, pinned pip-audit tool. Worker smoke tests also
 traverse installed package metadata, including required extras, and reject
 missing pins or a version that differs from the lock. Thus a new Transformers
 release cannot silently enter an unrelated PR's avatar environment.
+Container installs use a virtual environment that inherits the image's immutable
+Torch/CUDA packages. When worker inputs change, CI also builds the actual image
+and runs the smoke tests on CPU inside it; GPU hardware execution remains a
+deployment check.
 
 The locks retain validated application packages and update the previously untracked
 Torch runtimes to patched PyTorch 2.13.0 / torchvision 0.28.0. The immutable

@@ -5,8 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
+RUN python3 -m venv --without-pip --system-site-packages /opt/worker-venv
+ENV PATH="/opt/worker-venv/bin:${PATH}"
 COPY requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir --no-deps -r requirements.txt && pip check
+RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check
 COPY . ./avatar_worker
 
 RUN useradd --create-home --uid 10001 worker && \

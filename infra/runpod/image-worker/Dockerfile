@@ -14,8 +14,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OMNICHAT_WORKER_BUILD=${OMNICHAT_WORKER_BUILD}
 
 WORKDIR /app
+RUN python3 -m venv --without-pip --system-site-packages /opt/worker-venv
+ENV PATH="/opt/worker-venv/bin:${PATH}"
 COPY infra/runpod/image-worker/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir --no-deps -r requirements.txt && pip check
+RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check
 COPY infra/runpod/omnichat_worker ./omnichat_worker
 
 RUN useradd --create-home --uid 10001 worker && \

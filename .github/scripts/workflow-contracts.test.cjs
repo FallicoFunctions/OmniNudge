@@ -86,7 +86,8 @@ test('workers cannot silently resolve new dependencies in CI or container builds
   assert.equal(workers.steps.find(step => step.uses?.startsWith('actions/setup-python@')).with['python-version'], '3.12');
   for (const { requirements, torch, torchvision } of workers.strategy.matrix.include) {
     const docker = readFileSync(resolve(__dirname, '../..', requirements.replace('requirements.txt', 'Dockerfile')), 'utf8');
-    assert.ok(docker.includes('pip install --no-cache-dir --no-deps -r requirements.txt && pip check'));
+    assert.ok(docker.includes('python -m pip install --no-cache-dir --no-deps -r requirements.txt && python -m pip check'));
+    assert.ok(docker.includes('python3 -m venv --without-pip --system-site-packages /opt/worker-venv'));
     const base = /^FROM pytorch\/pytorch:([\d.]+)-cuda([\d.]+)-cudnn9-runtime@sha256:[a-f0-9]{64}$/m.exec(docker);
     assert.ok(base, 'the GPU runtime must be an immutable image');
     assert.equal(base[1], torch, 'CPU CI and container Torch versions must match');
@@ -94,4 +95,7 @@ test('workers cannot silently resolve new dependencies in CI or container builds
     assert.ok(pins.includes(`torch==${torch}`));
     assert.ok(pins.includes(`torchvision==${torchvision}`));
   }
+  const container = workers.steps.find(step => step.name === 'Build and exercise the pinned CUDA container on CPU');
+  assert.ok(container.run.includes('docker build'));
+  assert.ok(container.run.includes('scripts/worker-dependency-smoke.py "$WORKER_KIND"'));
 });
