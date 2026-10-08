@@ -289,7 +289,7 @@ not an edit:
 - Container disk: **at least 50 GB**; 60 GB is what is deployed. Wan 2.2
   TI2V-5B plus its UMT5 text encoder is a ~30 GB download, and Hugging Face
   needs scratch space on top of the final cache.
-- CUDA version: **12.8**, matching the PyTorch base image.
+- CUDA version: **13.0**, matching the PyTorch base image; use NVIDIA driver 580 or newer.
 - Execution timeout: **at least 1800 seconds**.
 - Environment: copy the R2/S3 block from the image template `7g36zlzlk5`
   (`OMNICHAT_OUTPUT_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
