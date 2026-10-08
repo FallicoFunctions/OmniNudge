@@ -44,17 +44,26 @@ format-only PRs.
 ## Python workers
 
 Each worker's `requirements.txt` is a complete, exact dependency lock. CI and
-Docker install it with `--no-deps`, then run `pip check`. Worker smoke tests also
+Docker install it with `--no-deps`, then run `pip check`. CI audits every lock
+using an isolated, pinned pip-audit tool. Worker smoke tests also
 traverse installed package metadata, including required extras, and reject
 missing pins or a version that differs from the lock. Thus a new Transformers
 release cannot silently enter an unrelated PR's avatar environment.
 
-The initial locks retain the versions from successful worker CI, including
-Transformers 5.18.0 for Kokoro. Only the known-broken 5.19.0 release is excluded;
-later releases remain eligible for the real import smoke test. The CPU/GPU
-PyTorch variants share public version pins. Their exact CUDA/triton dependencies
-remain owned by the container image. Ordinary Torch updates require a coordinated
-container change; security update PRs remain enabled.
+The locks retain validated application packages and update the previously untracked
+Torch runtimes to patched PyTorch 2.13.0 / torchvision 0.28.0. The immutable
+CUDA 13.0 image includes Python 3.12; CI uses matching CPU wheels. Unused
+TorchAudio is omitted, as in the upstream 2.13 installation instructions.
+The old Torch 2.6 CPU incompatibility no longer requires ignoring a Transformers
+release. The earlier NumPy Python 3.11 cap is also removed.
+
+CUDA packages are owned by the pinned image digest. The installed-graph guard
+allows only the named CUDA runtime graph underneath Torch, verifies its version
+constraints, and rejects an ordinary application dependency trying to use that
+exception. Tests also require the Docker image, CPU CI matrix, and lock pins to
+agree. Ordinary Torch updates require a coordinated container change; security
+update PRs remain enabled. For deployment, select a CUDA 13.0-capable GPU host;
+see the [RunPod runtime requirements](../infra/runpod/README.md).
 
 Dependabot can update all pinned packages. After manually changing a pin that
 requires a different transitive graph, regenerate and validate the lock:
@@ -66,7 +75,7 @@ python -m pip check
 PYTHONPATH=. python scripts/worker-dependency-smoke.py avatar
 ```
 
-The regeneration script resolves for Python 3.11/Linux using CPU PyTorch metadata
+The regeneration script resolves for Python 3.12/Linux using CPU PyTorch metadata
 without installing into the caller's environment. Existing exact pins act as
 constraints: incompatible pins must be deliberately updated together.
 

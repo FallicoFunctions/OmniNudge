@@ -1,6 +1,6 @@
-# CUDA 12.8/PyTorch 2.7 includes Blackwell kernels, which RunPod may assign
-# for the 24 GB serverless tier used by this endpoint.
-FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
+# This patched runtime retains Blackwell support. Select CUDA 13.0-capable
+# hosts when deploying; the digest also fixes the Python 3.12 base environment.
+FROM pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime@sha256:db80a41f8428644cebcb3d75b0b62df334ab6c0e75785951eb25f48bfbd42407
 
 # The image tag a RunPod template points at is not visible from inside the
 # container, so a generated asset cannot otherwise be traced back to the code

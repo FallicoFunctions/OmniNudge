@@ -41,16 +41,21 @@ class WorkerLockTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unpinned dependency: misaki requires spacy"):
             verify_lock(text.replace("spacy==3.8.16\n", ""), packages.__getitem__)
 
-    def test_gpu_runtime_exception_is_narrow_and_exact(self):
+    def test_gpu_runtime_exception_is_limited_to_the_container_graph(self):
         text, packages = self.fixture()
-        packages["torch"].requires = ["nvidia-cuda-runtime-cu12==12.4.127"]
-        packages["nvidia-cuda-runtime-cu12"] = SimpleNamespace(version="12.4.127", requires=[])
+        text = text.replace("torch==2.6.0", "torch==2.13.0")
+        packages["torch"].version = "2.13.0+cu130"
+        packages["torch"].requires = ["cuda-toolkit[cudart]==13.0.3", "cuda-bindings>=13.0.3,<14"]
+        packages["cuda-toolkit"] = SimpleNamespace(version="13.0.3", requires=['nvidia-cuda-runtime==13.0.96.*; extra == "cudart"'])
+        packages["nvidia-cuda-runtime"] = SimpleNamespace(version="13.0.96", requires=[])
+        packages["cuda-bindings"] = SimpleNamespace(version="13.0.3", requires=["cuda-pathfinder~=1.1"])
+        packages["cuda-pathfinder"] = SimpleNamespace(version="1.1.0", requires=[])
         verify_lock(text, packages.__getitem__)
-        packages["torch"].requires = ["nvidia-cuda-runtime-cu12>=12"]
+        packages["torch"].requires = ["cuda-toolkit"]
         with self.assertRaisesRegex(ValueError, "Unpinned dependency"):
             verify_lock(text, packages.__getitem__)
         packages["torch"].requires = []
-        packages["kokoro"].requires.append("nvidia-cuda-runtime-cu12==12.4.127")
+        packages["kokoro"].requires.append("cuda-toolkit==13.0.3")
         with self.assertRaisesRegex(ValueError, "Unpinned dependency"):
             verify_lock(text, packages.__getitem__)
 

@@ -2,10 +2,21 @@
 
 from importlib import metadata
 from pathlib import Path
-import re
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+
+
+# Supplied by the digest-pinned CUDA image, never resolved by worker pip installs.
+# PyTorch's CPU wheel has none of these. CUDA 13 uses cuda-toolkit extras and
+# bounded binding/runtime requirements, so their exact snapshot is the image.
+GPU_RUNTIME_PACKAGES = {
+    "cuda-toolkit", "cuda-bindings", "cuda-pathfinder", "triton",
+    "nvidia-cublas", "nvidia-cuda-runtime", "nvidia-cufft", "nvidia-cufile",
+    "nvidia-cuda-cupti", "nvidia-curand", "nvidia-cusolver", "nvidia-cusparse",
+    "nvidia-nvjitlink", "nvidia-cuda-nvrtc", "nvidia-nvtx",
+    "nvidia-cudnn-cu13", "nvidia-cusparselt-cu13", "nvidia-nccl-cu13", "nvidia-nvshmem-cu13",
+}
 
 
 def read_pins(text):
@@ -45,13 +56,8 @@ def verify_lock(text, distribution=metadata.distribution):
                                           for extra in {"", *extras}):
                 continue
             child = canonicalize_name(required.name)
-            # CUDA/triton wheels are installed by the GPU base image, absent in
-            # CPU CI. They must be exact dependencies of that pinned runtime.
-            base_runtime = (name == "torch" or re.fullmatch(r"nvidia-[a-z0-9-]+-cu12", name))
-            specifiers = list(required.specifier)
-            image_owned = (base_runtime and (child == "triton" or re.fullmatch(r"nvidia-[a-z0-9-]+-cu12", child))
-                           and len(specifiers) == 1 and specifiers[0].operator == "=="
-                           and "*" not in specifiers[0].version)
+            base_runtime = name == "torch" or name in GPU_RUNTIME_PACKAGES
+            image_owned = base_runtime and child in GPU_RUNTIME_PACKAGES and bool(required.specifier)
             if child not in pins and not image_owned:
                 raise ValueError(f"Unpinned dependency: {name} requires {required}; add it to the worker lock")
             resolved = distribution(child)

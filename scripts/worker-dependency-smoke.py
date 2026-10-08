@@ -15,7 +15,7 @@ def smoke(kind: str) -> None:
         import torch
         from diffusers import AutoPipelineForImage2Image, AutoPipelineForText2Image
 
-        assert torch.__version__.startswith("2.7.1"), torch.__version__
+        assert torch.__version__.startswith("2.13.0"), torch.__version__
         assert AutoPipelineForImage2Image and AutoPipelineForText2Image
         if kind == "image":
             import cv2
