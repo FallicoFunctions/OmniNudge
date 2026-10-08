@@ -4,7 +4,7 @@ Dependabot checks the configured projects daily. Compatible version changes can
 merge through `.github/workflows/dependabot-automerge.yml` only after all required
 CI, audit, worker, and performance checks succeed on a branch based on current
 `main`. The merger verifies the bot account ID, repository, commit signatures,
-changed files, version transitions, and head SHA. Major or configuration changes
+changed files, version transitions, and head SHA. Direct major or configuration changes
 remain review work. Failed checks remain merge blockers.
 
 ## npm audit repairs
@@ -19,18 +19,25 @@ It rejects manifest/source edits and direct major changes. It never uses `--forc
 or executes package lifecycle scripts while holding a write token.
 
 When a compatible fix exists, the publishing step creates a GitHub-signed Actions
-commit and a lockfile-only PR under `dependency-maintenance/npm-audit-*`. It
-explicitly dispatches the normal CI workflows because a token-authored push/PR
-cannot be relied on to start them unattended. The same protected merger validates
-the repair. Publishing is resumable and avoids duplicate checks for an unchanged
-head. Obsolete repair PRs are retired only after authenticating their bot authors
-and lockfile-only changes.
+commit under `dependency-maintenance/npm-audit-*`. A dedicated GitHub App creates
+the lockfile-only PR, which triggers the normal PR workflows. The App has only
+**Pull requests: write**, scoped to this repository; Actions still owns branch
+writes and signed commits. Registry resolution finishes before the App token is
+created, and that token is used only for PR creation.
 
-For these dispatched runs, the merger reads checks from the exact commit through
-GitHub's Checks API because the PR's GraphQL rollup can be empty. Required checks
-must come from GitHub Actions and pass on that head; other failing statuses also
-block merging. Dispatched secret scans use the same Gitleaks version and scan
-the full branch range from its merge base, matching a normal PR's scope.
+Repair branches include a fingerprint of their contents and stay immutable after
+publication. A different repair receives a new App-created PR rather than a
+token-authored update requiring another workflow approval. Publishing is
+resumable. Obsolete repair PRs are retired only after authenticating the configured
+App author, signed Actions commits, and lockfile-only changes.
+
+The merger requires both the PR's check summary and the exact commit's Checks API
+results to pass. Required checks must come from GitHub Actions on that head;
+other failing statuses also block merging. Successful `workflow_dispatch` jobs
+alone are insufficient: GitHub requires approval for PR workflow events created
+with `GITHUB_TOKEN`. Its [documented unattended alternative](https://docs.github.com/en/actions/concepts/security/github_token)
+is a GitHub App installation token. The publisher fails before creating a branch
+if a repair is needed and the configured App credential is unavailable.
 
 This covers registry audit findings that have not appeared in GitHub's Dependabot
 alerts. A zero alert count is not a substitute for successful npm audits. GitHub's
@@ -45,10 +52,31 @@ from checks that are still running.
 To verify the publisher after changing its permissions or code, manually dispatch
 `Dependency maintenance` with `verify_publication=true` after the update queue
 settles. This creates a clearly labeled test PR that changes only trailing
-whitespace in a lockfile, while exercising real GitHub signing, CI dispatch, and
+whitespace in a lockfile, while exercising real GitHub signing, App-created PRs, native CI, and
 automatic merging. The normal schedule never requests this test. Ordinary audit
 runs preserve cosmetic formatting, so the verification does not create a loop of
 format-only PRs.
+
+### One-time PR App setup
+
+Register a private App under **FallicoFunctions**, with webhooks disabled and only
+the repository permission **Pull requests: read and write**. Install it on
+**OmniNudge only**. It does not need Contents, Actions, Workflows, or Administration
+permissions. [Pre-filled registration form](https://github.com/settings/apps/new?name=OmniNudge%20Dependency%20CI&description=Create%20audited%20OmniNudge%20dependency%20repair%20pull%20requests&url=https%3A%2F%2Fgithub.com%2FFallicoFunctions%2FOmniNudge&public=false&webhook_active=false&pull_requests=write).
+
+Configure these repository Actions values after registration:
+
+- Variable `DEPENDENCY_PR_APP_CLIENT_ID`: the App's client ID.
+- Variable `DEPENDENCY_PR_APP_SLUG`: its slug, without `[bot]`.
+- Secret `DEPENDENCY_PR_APP_PRIVATE_KEY`: the complete generated PEM private key.
+
+Store the private key directly as an encrypted Actions secret; never commit it or
+paste it into logs. The pinned GitHub-owned token action mints a token limited to
+this repository and revokes it when the job finishes. The merger resolves the
+configured App's bot ID through GitHub and still independently verifies every
+Actions commit signature and allowed change. Until configuration is complete,
+ordinary clean audits and native Dependabot merging continue; new audit-repair
+publication is unavailable.
 
 ## Python workers
 
@@ -101,6 +129,10 @@ The regeneration script resolves for Python 3.12/Linux using CPU PyTorch metadat
 without installing into the caller's environment. It prefers existing lock
 versions while resolving the direct inputs. Both configured registries are
 explicitly trusted, matching pip-compile's cross-index selection.
+The generated lock also preserves pip-compile's native unsafe-package footer.
+Dependabot otherwise removes a newly introduced footer together with its required
+`setuptools` pin; the committed-lock contract and writer regression control protect
+against that omission.
 
 ## Fast guard checks
 

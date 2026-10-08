@@ -36,3 +36,4 @@ jobs:
         run: node .github/scripts/dependabot-automerge.cjs
         env:
           GH_TOKEN: ${{ github.token }}
+          DEPENDENCY_PR_APP_SLUG: ${{ vars.DEPENDENCY_PR_APP_SLUG }}
