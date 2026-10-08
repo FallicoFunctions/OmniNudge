@@ -59,7 +59,7 @@ test('backend coverage uses the fail-closed aggregate checker', () => {
     && step.with?.['node-version'] === '22'));
 });
 
-test('maintenance uses only main, has no token during resolution, and can dispatch every required workflow', () => {
+test('maintenance resolves without credentials and scopes its PR App token to this repository only', () => {
   const workflow = read('dependency-maintenance.yml');
   const steps = workflow.jobs.repair.steps;
   const checkout = steps.find(step => step.uses?.startsWith('actions/checkout@'));
@@ -71,13 +71,29 @@ test('maintenance uses only main, has no token during resolution, and can dispat
     'node .github/scripts/npm-audit-repair.cjs prepare', 'node .github/scripts/npm-audit-repair.cjs publish']);
   assert.equal(commands[0].env, undefined, 'registry commands must not receive the write token');
   assert.equal(commands[1].env, undefined, 'registry commands must not receive the write token');
-  assert.deepEqual(commands[2].env, { GH_TOKEN: '${{ github.token }}' });
-  assert.equal(workflow.permissions.actions, 'write');
+  assert.deepEqual(commands[2].env, { GH_TOKEN: '${{ github.token }}',
+    PR_CREATION_TOKEN: '${{ steps.pr-app.outputs.token }}',
+    DEPENDENCY_PR_APP_ACTUAL_SLUG: '${{ steps.pr-app.outputs.app-slug }}',
+    DEPENDENCY_PR_APP_SLUG: '${{ vars.DEPENDENCY_PR_APP_SLUG }}' });
+  const token = steps.find(step => step.id === 'pr-app');
+  assert.equal(token.uses, 'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1');
+  assert.equal(token.if, "steps.prepare.outputs.changed == 'true'");
+  assert.deepEqual(token.with, {
+    'client-id': '${{ vars.DEPENDENCY_PR_APP_CLIENT_ID }}',
+    'private-key': '${{ secrets.DEPENDENCY_PR_APP_PRIVATE_KEY }}',
+    owner: '${{ github.repository_owner }}', repositories: '${{ github.event.repository.name }}',
+    'permission-pull-requests': 'write',
+  });
+  assert.equal(commands[1].id, 'prepare');
+  assert.ok(steps.indexOf(token) > steps.indexOf(commands[1]), 'mint the App token only after registry resolution');
+  assert.equal(workflow.permissions.actions, undefined);
   assert.ok(workflow.on.schedule.length);
   assert.deepEqual(workflow.on.workflow_run.workflows, ['CI', 'Security Scan']);
   for (const name of require('./npm-audit-repair.cjs').WORKFLOWS) {
-    assert.ok(Object.hasOwn(read(name).on, 'workflow_dispatch'), `${name} needs an explicit CI trigger for token-authored repairs`);
+    assert.ok(Object.hasOwn(read(name).on, 'pull_request'), `${name} must run from the App-created PR event`);
   }
+  assert.equal(read('dependabot-automerge.yml').jobs.merge.steps.at(-1).env.DEPENDENCY_PR_APP_SLUG,
+    '${{ vars.DEPENDENCY_PR_APP_SLUG }}');
 });
 
 test('workers cannot silently resolve new dependencies in CI or container builds', () => {

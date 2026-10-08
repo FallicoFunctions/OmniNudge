@@ -27,11 +27,22 @@ const FILES = new Set([
 
 const MAINTENANCE_FILES = new Set(['frontend/package-lock.json', 'omnirave-babylon/package-lock.json']);
 
-function trustedMaintenancePullRequest(pr, repository) {
-  return pr.state === 'open' && !pr.draft && pr.user?.login === 'github-actions[bot]'
-    && pr.user?.id === 41898282 && pr.user?.type === 'Bot'
+function maintenancePublisher(slug, lookup) {
+  if (!slug) return null;
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)) throw new Error('Invalid dependency PR App slug');
+  const login = `${slug}[bot]`;
+  const user = lookup(`users/${encodeURIComponent(login)}`);
+  if (user.login !== login || user.type !== 'Bot' || !Number.isSafeInteger(user.id) || user.id <= 0) {
+    throw new Error('Dependency PR App identity could not be verified');
+  }
+  return user;
+}
+
+function trustedMaintenancePullRequest(pr, repository, publisher) {
+  return Boolean(publisher) && pr.state === 'open' && !pr.draft && pr.user?.login === publisher.login
+    && pr.user?.id === publisher.id && pr.user?.type === 'Bot'
     && pr.head?.repo?.full_name === repository && pr.base?.repo?.full_name === repository
-    && pr.base?.ref === 'main' && /^dependency-maintenance\/npm-(?:audit|verify)-[a-f0-9]{12}$/.test(pr.head?.ref || '');
+    && pr.base?.ref === 'main' && /^dependency-maintenance\/npm-(?:audit|verify)-[a-f0-9]{12}(?:-[a-f0-9]{12})?$/.test(pr.head?.ref || '');
 }
 
 function trustedMaintenanceChanges(pr, files, commits) {
@@ -177,5 +188,5 @@ function checksPassed(checks) {
       && ['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion));
 }
 
-module.exports = { DEPENDENCY_FILES: FILES, MAINTENANCE_FILES, REQUIRED_CHECKS, trustedPullRequest, trustedChanges,
+module.exports = { DEPENDENCY_FILES: FILES, MAINTENANCE_FILES, REQUIRED_CHECKS, maintenancePublisher, trustedPullRequest, trustedChanges,
   trustedMaintenancePullRequest, trustedMaintenanceChanges, compatibleVersion, compatibleManifest, checksPassed };

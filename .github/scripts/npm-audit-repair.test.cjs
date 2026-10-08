@@ -6,11 +6,12 @@ const childProcess = require('node:child_process');
 const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, rmSync } = require('node:fs');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
-const { assertCleanAudit, prepare, validateFiles, WORKFLOWS, gitEnvironment } = require('./npm-audit-repair.cjs');
+const { assertCleanAudit, prepare, validateFiles, gitEnvironment, repairBranch } = require('./npm-audit-repair.cjs');
 const { trustedMaintenancePullRequest, trustedMaintenanceChanges, compatibleManifest } = require('./dependabot-policy.cjs');
 
 const repository = 'FallicoFunctions/OmniNudge';
 const actions = { login: 'github-actions[bot]', id: 41898282, type: 'Bot' };
+const publisher = { login: 'dependency-ci[bot]', id: 123456789, type: 'Bot' };
 const clean = () => ({ status: 0, stdout: JSON.stringify({ metadata: { vulnerabilities: { total: 0 } }, vulnerabilities: {} }) });
 const vulnerable = () => ({ status: 1, stdout: JSON.stringify({ metadata: { vulnerabilities: { total: 1 } }, vulnerabilities: { 'source-map-js': {} } }) });
 const lock = version => ({ name: 'test', lockfileVersion: 3, packages: {
@@ -95,6 +96,26 @@ test('clean audits never run audit fix or rewrite platform metadata', () => {
   });
 });
 
+test('prepare CLI requests App credentials only when it actually produces changes', () => {
+  fixture(({ root }) => {
+    const scripts = join(root, '.github/scripts'), binary = join(root, 'bin');
+    mkdirSync(scripts, { recursive: true }); mkdirSync(binary);
+    for (const file of ['npm-audit-repair.cjs', 'dependabot-policy.cjs']) {
+      writeFileSync(join(scripts, file), readFileSync(join(__dirname, file)));
+    }
+    writeFileSync(join(binary, 'npm'), `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(clean().stdout)});\n`, { mode: 0o755 });
+    const output = join(root, 'step-output');
+    for (const verification of ['false', 'true']) {
+      writeFileSync(output, '');
+      childProcess.execFileSync(process.execPath, [join(scripts, 'npm-audit-repair.cjs'), 'prepare'], {
+        env: { ...process.env, PATH: `${binary}:${process.env.PATH}`, GITHUB_OUTPUT: output, AUDIT_REPAIR_VERIFY: verification },
+        stdio: 'pipe',
+      });
+      assert.equal(readFileSync(output, 'utf8'), `changed=${verification}\n`);
+    }
+  });
+});
+
 test('audit service errors, malformed reports and unresolved findings fail closed', () => {
   assertCleanAudit(clean(), 'fixture');
   for (const bad of [{ status: 0, stdout: '{}' }, { status: 0, stdout: 'invalid' },
@@ -139,17 +160,18 @@ test('produced source edits, manifest changes and direct major bumps are rejecte
   });
 });
 
-test('maintenance trust requires the actual Actions bot, signed commits and only the two lockfiles', () => {
-  const pr = { state: 'open', draft: false, user: actions, changed_files: 1, commits: 1,
+test('maintenance trust requires the configured App author, signed Actions commits and only the two lockfiles', () => {
+  const pr = { state: 'open', draft: false, user: publisher, changed_files: 1, commits: 1,
     head: { sha: 'head', ref: 'dependency-maintenance/npm-audit-012345abcdef', repo: { full_name: repository } },
     base: { ref: 'main', repo: { full_name: repository } } };
   const commit = { sha: 'head', author: actions, commit: { verification: { verified: true } } };
   const file = { filename: 'frontend/package-lock.json', status: 'modified' };
-  assert.equal(trustedMaintenancePullRequest(pr, repository), true);
+  assert.equal(trustedMaintenancePullRequest(pr, repository, publisher), true);
+  assert.equal(trustedMaintenancePullRequest(pr, repository), false, 'missing App configuration must fail closed');
   assert.equal(trustedMaintenanceChanges(pr, [file], [commit]), true);
-  for (const change of [{ user: { ...actions, id: 1 } }, { user: { ...actions, type: 'User' } }, { state: 'closed' },
+  for (const change of [{ user: actions }, { user: { ...publisher, id: 1 } }, { user: { ...publisher, type: 'User' } }, { state: 'closed' },
     { head: { ...pr.head, repo: { full_name: 'attacker/fork' } } }, { head: { ...pr.head, ref: 'other' } }, { draft: true }]) {
-    assert.equal(trustedMaintenancePullRequest({ ...pr, ...change }, repository), false);
+    assert.equal(trustedMaintenancePullRequest({ ...pr, ...change }, repository, publisher), false);
   }
   for (const filename of ['frontend/package.json', '.github/workflows/ci.yml', 'infra/avatar-worker/requirements.txt']) {
     assert.equal(trustedMaintenanceChanges(pr, [{ ...file, filename }], [commit]), false);
@@ -160,20 +182,28 @@ test('maintenance trust requires the actual Actions bot, signed commits and only
   assert.equal(trustedMaintenanceChanges({ ...pr, changed_files: 2 }, [file], [commit]), false);
 });
 
-test('publisher uses a signed expected-head commit and dispatches all CI workflows without a manual merge', () => {
+test('changed repair contents get distinct immutable branches while retries keep the same branch', () => {
+  const files = [['frontend/package-lock.json', JSON.stringify(lock('1.2.2'))]];
+  const first = repairBranch('012345abcdef012345abcdef', false, files);
+  assert.match(first, /^dependency-maintenance\/npm-audit-012345abcdef-[a-f0-9]{12}$/);
+  assert.equal(repairBranch('012345abcdef012345abcdef', false, files), first);
+  assert.notEqual(repairBranch('012345abcdef012345abcdef', false,
+    [['frontend/package-lock.json', JSON.stringify(lock('1.2.3'))]]), first);
+});
+
+test('publisher signs with Actions and uses the App token only to create a PR with native CI', () => {
   fixture(({ root, before, base }) => {
     writeFileSync(join(root, 'frontend/package-lock.json'), JSON.stringify(lock('1.2.2')));
     const original = childProcess.execFileSync;
-    const calls = [], branch = `dependency-maintenance/npm-audit-${base.slice(0, 12)}`;
+    const branch = repairBranch(base, false, [['frontend/package-lock.json', readFileSync(join(root, 'frontend/package-lock.json'), 'utf8')]]);
+    const values = { DEPENDENCY_PR_APP_SLUG: 'dependency-ci', DEPENDENCY_PR_APP_ACTUAL_SLUG: 'dependency-ci', PR_CREATION_TOKEN: 'fixture-app-token' };
+    const previous = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+    const calls = [];
+    Object.assign(process.env, values);
     childProcess.execFileSync = (command, args, options) => {
       if (command !== 'gh') return original(command, args, options);
       calls.push(args);
-      if (args[0] === 'workflow') return '';
-      if (args[0] === 'pr') {
-        assert.equal(args[1], 'create');
-        assert.ok(readFileSync(args.at(-1), 'utf8').includes('All normal CI'));
-        return 'https://github.com/example/repo/pull/1\n';
-      }
+      assert.equal(args[0], 'api');
       if (args[1] === 'graphql') {
         const input = JSON.parse(options.input).variables.input;
         assert.equal(input.expectedHeadOid, base);
@@ -181,7 +211,20 @@ test('publisher uses a signed expected-head commit and dispatches all CI workflo
         assert.deepEqual(input.fileChanges.additions.map(file => file.path), ['frontend/package-lock.json']);
         return JSON.stringify({ data: { createCommitOnBranch: { commit: { oid: 'signed-head' } } } });
       }
-      const path = args.find(arg => arg.startsWith('repos/'));
+      const path = args.find(arg => arg.startsWith('repos/') || arg.startsWith('users/'));
+      if (path.startsWith('users/')) return JSON.stringify(publisher);
+      if (path.endsWith('/pulls')) {
+        assert.ok(args.includes('POST'));
+        assert.equal(options.env.GH_TOKEN, 'fixture-app-token');
+        const request = JSON.parse(options.input);
+        assert.equal(request.head, branch);
+        assert.equal(request.base, 'main');
+        assert.ok(request.body.includes('All normal CI'));
+        return JSON.stringify({ number: 1, state: 'open', draft: false, user: publisher,
+          head: { sha: 'signed-head', ref: branch, repo: { full_name: repository } },
+          base: { ref: 'main', repo: { full_name: repository } } });
+      }
+      assert.equal(options.env, undefined, 'the App must not create branches or write contents');
       if (path.endsWith('/git/ref/heads/main')) return JSON.stringify({ object: { sha: base } });
       if (path.includes('/pulls?')) return '[[]]';
       if (path.includes('/git/matching-refs/')) return '[]';
@@ -190,17 +233,26 @@ test('publisher uses a signed expected-head commit and dispatches all CI workflo
         const file = path.split('/contents/')[1].split('?')[0];
         return JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from(before[file]).toString('base64') });
       }
-      if (path.includes('/actions/workflows/')) return '{"workflow_runs":[]}';
       throw new Error(`Unexpected API call ${path}`);
     };
     try {
       delete require.cache[require.resolve('./npm-audit-repair.cjs')];
-      require('./npm-audit-repair.cjs').publish(root, repository);
-      assert.deepEqual(calls.filter(args => args[0] === 'workflow').map(args => args[2]), WORKFLOWS);
-      assert.ok(calls.filter(args => args[0] === 'workflow').every(args => args.at(-1) === branch));
+      const { publish } = require('./npm-audit-repair.cjs');
+      delete process.env.PR_CREATION_TOKEN;
+      assert.throws(() => publish(root, repository), /Configure the dependency PR GitHub App/);
+      process.env.PR_CREATION_TOKEN = values.PR_CREATION_TOKEN;
+      process.env.DEPENDENCY_PR_APP_ACTUAL_SLUG = 'wrong-app';
+      assert.throws(() => publish(root, repository), /Configure the dependency PR GitHub App/);
+      assert.ok(!calls.some(args => args.includes('POST')), 'missing or mismatched credentials must not mutate GitHub');
+      process.env.DEPENDENCY_PR_APP_ACTUAL_SLUG = values.DEPENDENCY_PR_APP_ACTUAL_SLUG;
+      publish(root, repository);
+      assert.ok(!calls.some(args => args[0] === 'workflow'), 'PR creation must trigger native CI; dispatch cannot satisfy its approval gate');
       assert.ok(!calls.some(args => args.includes('merge') || args.includes('--force')));
     } finally {
       childProcess.execFileSync = original;
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
       delete require.cache[require.resolve('./npm-audit-repair.cjs')];
     }
   });

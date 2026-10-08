@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { REQUIRED_CHECKS, trustedPullRequest, trustedChanges, compatibleVersion, compatibleManifest, checksPassed } = require('./dependabot-policy.cjs');
+const { REQUIRED_CHECKS, maintenancePublisher, trustedPullRequest, trustedChanges, compatibleVersion, compatibleManifest, checksPassed } = require('./dependabot-policy.cjs');
 
 const repository = 'FallicoFunctions/OmniNudge';
 const bot = { login: 'dependabot[bot]', id: 49699333, type: 'Bot' };
@@ -12,6 +12,18 @@ const pr = { state: 'open', draft: false, user: bot, changed_files: 1, commits: 
 const commit = { sha: 'abc', author: bot, commit: { verification: { verified: true } } };
 const files = [{ filename: 'frontend/package-lock.json', status: 'modified' }];
 const check = name => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' });
+
+test('maintenance publisher resolves only the configured App bot and fails closed without it', () => {
+  const publisher = { login: 'dependency-ci[bot]', id: 123456789, type: 'Bot' };
+  assert.equal(maintenancePublisher('', () => { throw new Error('unexpected lookup'); }), null);
+  assert.deepEqual(maintenancePublisher('dependency-ci', path => {
+    assert.equal(path, 'users/dependency-ci%5Bbot%5D'); return publisher;
+  }), publisher);
+  assert.throws(() => maintenancePublisher('../attacker', () => publisher), /Invalid/);
+  for (const invalid of [{ ...publisher, id: 0 }, { ...publisher, type: 'User' }, { ...publisher, login: 'other[bot]' }]) {
+    assert.throws(() => maintenancePublisher('dependency-ci', () => invalid), /identity/);
+  }
+});
 
 test('only authenticated same-repository Dependabot PRs are eligible', () => {
   assert.equal(trustedPullRequest(pr, repository), true);

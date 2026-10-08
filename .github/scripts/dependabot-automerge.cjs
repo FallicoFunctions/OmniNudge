@@ -2,7 +2,7 @@
 
 const { execFileSync } = require('node:child_process');
 const { trustedPullRequest, trustedChanges, trustedMaintenancePullRequest, trustedMaintenanceChanges,
-  compatibleManifest, checksPassed, REQUIRED_CHECKS } = require('./dependabot-policy.cjs');
+  compatibleManifest, checksPassed, REQUIRED_CHECKS, maintenancePublisher } = require('./dependabot-policy.cjs');
 const { appendFileSync } = require('node:fs');
 
 function gh(args) {
@@ -115,11 +115,18 @@ function requestRefresh(repository, pr) {
 
 function run(repository) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository || '')) throw new Error('Invalid repository');
+  let publisher = null, failed = false;
+  try {
+    publisher = maintenancePublisher(process.env.DEPENDENCY_PR_APP_SLUG, api);
+  } catch (error) {
+    console.error(`Dependency PR App configuration: ${error.message}`);
+    failed = true;
+  }
+  const trustedMaintenance = (pr, repo) => trustedMaintenancePullRequest(pr, repo, publisher);
   recoverInterruptedRefresh(repository);
-  let failed = false;
   for (const candidate of pages(`repos/${repository}/pulls?state=open&base=main&per_page=100`)) {
-    const maintenance = trustedMaintenancePullRequest(candidate, repository);
-    const trustedPR = maintenance ? trustedMaintenancePullRequest : trustedPullRequest;
+    const maintenance = trustedMaintenance(candidate, repository);
+    const trustedPR = maintenance ? trustedMaintenance : trustedPullRequest;
     const trustedFiles = maintenance ? trustedMaintenanceChanges : trustedChanges;
     if (!trustedPR(candidate, repository)) continue;
     try {
@@ -152,9 +159,11 @@ function run(repository) {
         }
         requestRefresh(repository, pr); continue;
       }
-      const checks = maintenance ? maintenanceChecks(repository, pr.head.sha)
-        : gh(['pr', 'view', String(pr.number), '--repo', repository, '--json', 'statusCheckRollup']).statusCheckRollup;
-      if (!checksPassed(checks)) {
+      const rollup = gh(['pr', 'view', String(pr.number), '--repo', repository, '--json', 'statusCheckRollup']).statusCheckRollup;
+      const checks = maintenance ? maintenanceChecks(repository, pr.head.sha) : rollup;
+      // Dispatched jobs can succeed while GitHub's PR workflows still require
+      // approval. Both the actual commit checks and the PR checks must pass.
+      if (!checksPassed(rollup) || !checksPassed(checks)) {
         const blockers = checks.filter(check => check.status === 'COMPLETED'
           && (!['SUCCESS', 'SKIPPED', 'NEUTRAL'].includes(check.conclusion)
             || (REQUIRED_CHECKS.includes(check.name) && check.conclusion !== 'SUCCESS')));

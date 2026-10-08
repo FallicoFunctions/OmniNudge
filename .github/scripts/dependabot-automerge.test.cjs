@@ -8,15 +8,19 @@ const { REQUIRED_CHECKS } = require('./dependabot-policy.cjs');
 const repository = 'FallicoFunctions/OmniNudge';
 const bot = { login: 'dependabot[bot]', id: 49699333, type: 'Bot' };
 const actions = { login: 'github-actions[bot]', id: 41898282, type: 'Bot' };
+const publisher = { login: 'dependency-ci[bot]', id: 123456789, type: 'Bot' };
 const label = 'dependabot-refresh-in-progress';
 function fixture(options = {}) {
   const original = childProcess.execFileSync;
   const originalClock = Date.now;
   const originalExitCode = process.exitCode;
   const originalDryRun = process.env.DEPENDABOT_DRY_RUN;
+  const originalPublisher = process.env.DEPENDENCY_PR_APP_SLUG;
+  if (options.maintenance || options.publisherLookupFailure) process.env.DEPENDENCY_PR_APP_SLUG = 'dependency-ci';
+  else delete process.env.DEPENDENCY_PR_APP_SLUG;
   const observed = { calls: [], comments: [], events: [], merges: [], labels: [], messages: [] };
   const author = options.maintenance ? actions : bot;
-  const pr = { number: 1, state: 'open', draft: false, user: author, changed_files: 1, commits: 1,
+  const pr = { number: 1, state: 'open', draft: false, user: options.maintenance ? publisher : bot, changed_files: 1, commits: 1,
     head: { sha: 'abc', ref: options.maintenance ? 'dependency-maintenance/npm-audit-012345abcdef' : 'dependabot/pip/image/update', repo: { full_name: repository } },
     base: { sha: 'base', ref: 'main', repo: { full_name: repository } } };
   Object.defineProperty(pr, 'labels', { enumerable: true, get: () => observed.labels.map(name => ({ name })) });
@@ -33,10 +37,14 @@ function fixture(options = {}) {
         observed.comments.push({ body: args.at(-1), user: actions, created_at: new Date(state.time).toISOString() });
         return '';
       }
-      return JSON.stringify({ statusCheckRollup: REQUIRED_CHECKS.map(name => ({ name,
+      return JSON.stringify({ statusCheckRollup: state.missingRollup ? [] : REQUIRED_CHECKS.map(name => ({ name,
         status: 'COMPLETED', conclusion: state.failure ? 'FAILURE' : 'SUCCESS' })) });
     }
-    const endpoint = args.find(arg => arg.startsWith('repos/'));
+    const endpoint = args.find(arg => arg.startsWith('repos/') || arg.startsWith('users/'));
+    if (endpoint.startsWith('users/')) {
+      if (state.publisherLookupFailure) throw new Error('App bot is unavailable');
+      return JSON.stringify(publisher);
+    }
     const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
     let result;
     if (endpoint.includes('/check-runs?')) {
@@ -96,6 +104,8 @@ function fixture(options = {}) {
     process.exitCode = originalExitCode;
     if (originalDryRun === undefined) delete process.env.DEPENDABOT_DRY_RUN;
     else process.env.DEPENDABOT_DRY_RUN = originalDryRun;
+    if (originalPublisher === undefined) delete process.env.DEPENDENCY_PR_APP_SLUG;
+    else process.env.DEPENDENCY_PR_APP_SLUG = originalPublisher;
     delete require.cache[require.resolve('./dependabot-automerge.cjs')];
   } };
 }
@@ -130,8 +140,16 @@ test('signed audit repairs use the same merge gates and never request a Dependab
   });
 });
 
-test('dispatched repair checks require the exact head and Actions provider and honor other failures', () => {
-  for (const option of ['wrongCheckHead', 'wrongCheckApp', 'classicFailure']) {
+test('an unavailable optional PR App reports failure while native Dependabot merges still proceed', () => {
+  withFixture({ publisherLookupFailure: true }, f => {
+    f.run();
+    assert.equal(f.observed.merges.length, 1);
+    assert.equal(process.exitCode, 1);
+  });
+});
+
+test('repair checks require the actual PR rollup, exact head, Actions provider and no other failures', () => {
+  for (const option of ['wrongCheckHead', 'wrongCheckApp', 'classicFailure', 'missingRollup']) {
     withFixture({ maintenance: true, [option]: true }, f => {
       f.run();
       assert.equal(f.observed.merges.length, 0, option);
@@ -140,8 +158,8 @@ test('dispatched repair checks require the exact head and Actions provider and h
   withFixture({ maintenance: true }, f => {
     f.run();
     assert.equal(f.observed.merges.length, 1);
-    assert.ok(!f.observed.calls.some(args => args[0] === 'pr' && args[1] === 'view'),
-      'dispatched checks must not depend on the missing GraphQL PR rollup');
+    assert.ok(f.observed.calls.some(args => args[0] === 'pr' && args[1] === 'view'),
+      'successful dispatches alone cannot bypass the PR workflow approval gate');
   });
 });
 
