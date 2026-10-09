@@ -6,8 +6,8 @@ runpod==1.12.0
 boto3==1.43.108
 Pillow==12.3.0
 accelerate==1.15.0
-diffusers==0.40.0
-transformers==5.18.0
+diffusers==0.41.0
+transformers==5.19.0
 safetensors==0.8.0
 imageio==2.38.0
 imageio-ffmpeg==0.6.0
