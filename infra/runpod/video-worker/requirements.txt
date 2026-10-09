@@ -24,7 +24,7 @@ click==8.5.0
 colorama==0.4.6
 cryptography==50.0.2
 detect-installer==0.2.1
-diffusers==0.40.0
+diffusers==0.41.0
 dnspython==2.8.0
 email-validator==2.3.0
 fastapi==0.142.2
@@ -108,8 +108,8 @@ torch==2.13.0+cpu
 torchvision==0.28.0+cpu
 tqdm==4.70.1
 tqdm-loggable==0.4.1
-transformers==5.18.0
-typer==0.27.2
+transformers==5.19.0
+typer==0.27.3
 typing-extensions==4.16.0
 typing-inspection==0.4.4
 urllib3==2.8.0
