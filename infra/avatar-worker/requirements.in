@@ -2,11 +2,11 @@
 # CPU wheels provide portable resolver metadata; Docker retains its matching CUDA wheels.
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-livekit==1.1.20
+livekit==1.1.21
 kokoro==0.9.4
 Pillow==12.3.0
-numpy==2.5.3
+numpy==2.5.4
 soundfile==0.14.0
-transformers==5.18.0
+transformers==5.20.1
 torch==2.13.0+cpu
 torchvision==0.28.0+cpu
