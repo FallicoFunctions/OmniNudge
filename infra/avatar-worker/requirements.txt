@@ -51,7 +51,7 @@ num2words==0.5.14
 numpy==2.5.3
 packaging==26.3
 phonemizer-fork==3.3.2
-pillow==12.3.0
+pillow==13.0.0
 preshed==3.0.13
 protobuf==7.36.2
 pycparser==3.0
